@@ -1,3 +1,4 @@
+package com.minidb.storage;
 /**
  * SlotDirectory is a metadata structure within a Page that manages the mapping
  * between logical record identifiers (slot IDs) and their physical positions
@@ -49,6 +50,10 @@ public class SlotDirectory {
 		lengths = new int[maxSlots];
 	}
 	
+	public SlotEntry get(int slotId) {
+		return new SlotEntry(slots[slotId], lengths[slotId], valid[slotId]);
+	}
+
 	public int addSlot(int offset, int length) {
 		for (int i=0; i<valid.length; i++) {
 			if (!valid[i]) {
@@ -79,5 +84,18 @@ public class SlotDirectory {
 	public boolean isValid(int slotId) {
 		return valid[slotId];
 	}
+
+
+ 	public void updateSlot(int slotId, int offset, int length) {
+		slots[slotId] = offset;
+		lengths[slotId] = length;
+	}
+ 
+  	public void addSlot(int slotId, int offset, int length) {
+		slots[slotId] = offset;
+		lengths[slotId] = length;
+		valid[slotId] = true;
+	}
+
 }
 

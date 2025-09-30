@@ -1,3 +1,4 @@
+package com.minidb.storage;
 public interface RecordStorage {
 	
 	// Inserts the record value into the Storage
