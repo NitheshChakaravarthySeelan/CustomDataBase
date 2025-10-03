@@ -2,54 +2,51 @@ package com.minidb.index;
 
 import java.util.List;
 
-// This is basically a abstract implementation
-public abstract class Node<K, V> {
-    // Unique Id from pageManager 
-    protected int pageId;
-    protected List<K> keys;
-    protected boolean isLeaf;
-    protected int order;
+public abstract class Node<K extends Comparable<K>, V> {
+    protected final int order;
+    protected final List<K> keys;
+    protected final Serializer<K> keySerializer;
+    protected final Serializer<V> valueSerializer;
+    protected InternalNode<K, V> parent;
 
-    public static class SplitResult<K, N extends Node<K,?>> {
-        public final K splitKey;
-        public final N rightNode;
-
-        public SplitResult(K splitKey, N rightNode) {
-            this.splitKey = splitKey;
-            this.rightNode = rightNode;
-        }
-
-        public K getSplitKey() {
-            return splitKey;
-        }
-
-        public N getRightNode() {
-            return rightNode;
-        }
-    }
-
-    public boolean isLeaf() {
-        return isLeaf;
+    public Node(int order, List<K> keys, Serializer<K> keySerializer, Serializer<V> valueSerializer) {
+        this.order = order;
+        this.keys = keys;
+        this.keySerializer = keySerializer;
+        this.valueSerializer = valueSerializer;
     }
 
     public int keyCount() {
         return keys.size();
     }
 
-    public boolean isOverflow() {
-        return keyCount() >= order;
-    }
+    public abstract boolean isLeaf();
 
-    boolean isUnderflow() {
-        return keyCount() < order / 2;
-    }
-
-    public abstract SplitResult<K, ? extends Node<K, V>>insert(K key, V value);
-
-    // Recursive search down the tree
     public abstract V search(K key);
 
-    public abstract byte[] serialize();
-    
-    public abstract void deserialize(byte[] data);
+    public abstract SplitResult<K, ? extends Node<K, V>> insert(K key, V value);
+
+    public abstract void delete(K key);
+
+    public abstract K getFirstKey();
+
+    /**
+     * A node is under-full if it has fewer than ceil(order/2) - 1 keys.
+     * For simplicity, we'll use (order-1)/2.
+     */
+    protected boolean isUnderflow() {
+        return keys.size() < (order - 1) / 2;
+    }
+
+    public static class SplitResult<K extends Comparable<K>, N extends Node<K, ?>> {
+        private final K splitKey;
+        private final N rightNode;
+
+        public SplitResult(K splitKey, N rightNode) {
+            this.splitKey = splitKey;
+            this.rightNode = rightNode;
+        }
+        public K getSplitKey() { return splitKey; }
+        public N getRightNode() { return rightNode; }
+    }
 }

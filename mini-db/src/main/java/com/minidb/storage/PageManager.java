@@ -162,4 +162,8 @@ public class PageManager {
 		writePage(0, metaPage);
 		dbFile.close();
 	}
+
+	public int getPageSize() {
+		return 4096;
+	}
 }

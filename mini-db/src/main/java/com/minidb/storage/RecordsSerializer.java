@@ -66,25 +66,25 @@ public class RecordsSerializer {
 
             switch (column.type) {
                 case INT:
-                    ByteBuffer buf = ByteBuffer.allocate(4);
+                    ByteBuffer buf = ByteBuffer.allocate(Integer.BYTES);
                     buf.putInt((Integer) value);
                     outputStream.write(buf.array());
                     break;
                 case LONG:
-                    buf = ByteBuffer.allocate(8);
+                    buf = ByteBuffer.allocate(Long.BYTES);
                     buf.putLong((Long) value);
                     outputStream.write(buf.array());
                     break;
                 case STRING:
                     byte[] strBytes = ((String) value).getBytes(StandardCharsets.UTF_8);
-                    buf = ByteBuffer.allocate(4);
+                    buf = ByteBuffer.allocate(Integer.BYTES);
                     buf.putInt(strBytes.length);  // write length prefix
                     outputStream.write(buf.array());
                     outputStream.write(strBytes);
                     break;
                 case BYTE_ARRAY:
                     byte[] data = (byte[]) value;
-                    buf = ByteBuffer.allocate(4);
+                    buf = ByteBuffer.allocate(Integer.BYTES);
                     buf.putInt(data.length);
                     outputStream.write(buf.array());
                     outputStream.write(data);
@@ -112,21 +112,21 @@ public class RecordsSerializer {
                 switch (column.type) {
                     case INT:
                         // read 4 bytes
-                        int intValue = ByteBuffer.wrap(recordBytes, offset, 4).getInt();
+                        int intValue = ByteBuffer.wrap(recordBytes, offset, Integer.BYTES).getInt();
                         row.values[i] = intValue;
-                        offset += 4;
+                        offset += Integer.BYTES;
                         break;
 
                     case LONG:
-                        long longValue = ByteBuffer.wrap(recordBytes, offset, 8).getLong();
+                        long longValue = ByteBuffer.wrap(recordBytes, offset, Long.BYTES).getLong();
                         row.values[i] = longValue;
-                        offset += 8;
+                        offset += Long.BYTES;
                         break;
 
                     case STRING:
                         // first read length (4 bytes)
-                        int strLen = ByteBuffer.wrap(recordBytes, offset, 4).getInt();
-                        offset += 4;
+                        int strLen = ByteBuffer.wrap(recordBytes, offset, Integer.BYTES).getInt();
+                        offset += Integer.BYTES;
 
                         // read string bytes
                         String strValue = new String(recordBytes, offset, strLen, StandardCharsets.UTF_8);
@@ -135,8 +135,8 @@ public class RecordsSerializer {
                         break;
 
                     case BYTE_ARRAY:
-                        int byteLen = ByteBuffer.wrap(recordBytes, offset, 4).getInt();
-                        offset += 4;
+                        int byteLen = ByteBuffer.wrap(recordBytes, offset, Integer.BYTES).getInt();
+                        offset += Integer.BYTES;
 
                         byte[] data = Arrays.copyOfRange(recordBytes, offset, offset + byteLen);
                         row.values[i] = data;

@@ -25,11 +25,13 @@ public class NodeFactory<K extends Comparable<K>, V> {
                 leaf.pageId = pageId;
                 leaf.deserialize(data);
                 node = leaf;
+                break;
             case 2:
                 InternalNode<K,V> internal = new InternalNode<>(order, keySerializer, valueSerializer);
                 internal.pageId = pageId;
                 internal.deserialize(data);
                 node = internal;
+                break;
             default:
                 throw new IllegalStateException("Unknown node type" + flag);
         }

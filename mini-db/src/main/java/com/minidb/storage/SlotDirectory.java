@@ -29,6 +29,11 @@ public class SlotDirectory {
         return slots[slotId].isValid();
     }
 
+    // This method was missing but referenced in Page.java's logic
+    public int findFreeSlot() {
+        // This is a simplified version of what addSlot does
+        return addSlot(0, 0);
+    }
     public SlotEntry get(int slotId) {
         return slots[slotId];
     }

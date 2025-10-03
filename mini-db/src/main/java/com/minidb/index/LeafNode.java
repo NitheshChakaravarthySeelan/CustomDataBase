@@ -1,144 +1,112 @@
 package com.minidb.index;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class LeafNode<K extends Comparable<K>, V> extends Node<K, V> {
-    protected List<V> values;
-    protected LeafNode<K, V> nextNode;
-    private final Serializer<K> keySerializer;
-    private final Serializer<V> valueSerializer;
+    final List<V> values;
+    LeafNode<K, V> nextNode;
 
-
-    public LeafNode(int order, Serializer<K> keySer, Serializer<V> valSer) {
-        this.order = order;
-        this.keys = new ArrayList<>(order);
-        this.values = new ArrayList<>(order);
-        this.keySerializer = keySer;
-        this.valueSerializer = valSer;
-        this.isLeaf = true;
+    public LeafNode(int order, Serializer<K> keySerializer, Serializer<V> valueSerializer) {
+        super(order, new ArrayList<>(), keySerializer, valueSerializer);
+        this.values = new ArrayList<>();
     }
 
     @Override
-    public SplitResult<K, ? extends Node<K, V>> insert(K key, V value) {
-        int pos = findInsertPosition(key);
-        keys.add(pos, key);
-        values.add(pos, value);
-
-        if (keys.size() < order) {
-            return null; // No split
-        }
-
-        int mid = keys.size() / 2;
-        LeafNode<K, V> rightNode = new LeafNode<>(order,keySerializer, valueSerializer);
-        
-        // Copy second half to the right node
-        rightNode.keys.addAll(keys.subList(mid, keys.size()));
-        rightNode.values.addAll(values.subList(mid, values.size()));
-
-        // Keep left half in current node
-        keys = new ArrayList<>(keys.subList(0, mid));
-        values = new ArrayList<>(values.subList(0, mid));
-
-        
-        // Update linked list pointer
-        rightNode.nextNode = nextNode;
-        nextNode = rightNode;
-
-        // Promote the first key of the right node as parent
-        K splitKey = rightNode.keys.get(0);
-
-        return new SplitResult<>(splitKey, rightNode);
+    public boolean isLeaf() {
+        return true;
     }
 
     @Override
     public V search(K key) {
-        int left = 0;
-        int right = keys.size() - 1;
-        while (left <= right) {
-            int mid = (left + right) / 2;
-            int cmp = key.compareTo(keys.get(mid));
-            if (cmp == 0) {
-                return values.get(mid);
-            } else if (cmp < 0) {
-                right = mid - 1;
-            } else {
-                left = mid + 1;
-            }
-        }
-        return null;
+        int index = Collections.binarySearch(keys, key);
+        return index >= 0 ? values.get(index) : null;
     }
 
     @Override
-    public byte[] serialize() {
-        int totalSize = 4 + 4; // 4 for numKeys and 4 for nextNode
-        List<byte[]> keyBytes = new ArrayList<>(keys.size());
-        List<byte[]> valueBytes = new ArrayList<>(values.size());
-        for (int i=0; i<keys.size(); i++) {
-            keyBytes.add(keySerializer.serialize(keys.get(i)));
-            valueBytes.add(valueSerializer.serialize(values.get(i)));
-            totalSize += 4 + 4 + keyBytes.get(i).length + valueBytes.get(i).length;
-        }
-        
-        ByteBuffer buffer = ByteBuffer.allocate(totalSize);
-        buffer.putInt(keys.size());
+    public SplitResult<K, LeafNode<K, V>> insert(K key, V value) {
+        int index = Collections.binarySearch(keys, key);
+        int insertionPoint = (index >= 0) ? index : -index - 1;
 
-        for (int i = 0; i < keys.size(); i++) {
-            byte[] kBytes = keyBytes.get(i);
-            byte[] vBytes = valueBytes.get(i);
-            buffer.putInt(kBytes.length);
-            buffer.put(kBytes);
-            buffer.putInt(vBytes.length);
-            buffer.put(vBytes);
+        if (index >= 0) { // Key exists, update value
+            values.set(insertionPoint, value);
+        } else { // Key does not exist, insert new
+            keys.add(insertionPoint, key);
+            values.add(insertionPoint, value);
         }
 
-        buffer.putInt(nextNode != null ? nextNode.pageId : -1);
-        return buffer.array();
+        if (keys.size() < order) {
+            return null; // No split needed
+        }
+
+        // Split the node
+        int mid = keys.size() / 2;
+        LeafNode<K, V> rightNode = new LeafNode<>(order, keySerializer, valueSerializer);
+
+        rightNode.keys.addAll(keys.subList(mid, keys.size()));
+        rightNode.values.addAll(values.subList(mid, values.size()));
+
+        // Clear the second half from the current node
+        keys.subList(mid, keys.size()).clear();
+        values.subList(mid, values.size()).clear();
+
+        // Link the leaf nodes
+        rightNode.nextNode = this.nextNode;
+        this.nextNode = rightNode;
+
+        return new SplitResult<>(rightNode.getFirstKey(), rightNode);
     }
 
     @Override
-    public void deserialize(byte[] data) {
-        ByteBuffer buffer = ByteBuffer.wrap(data);
-        int numKeys = buffer.getInt();
-        keys.clear();
-        values.clear();
-
-        for (int i = 0; i < numKeys; i++) {
-            int keyLen = buffer.getInt();
-            byte[] kBytes = new byte[keyLen];
-            buffer.get(kBytes);
-
-            int valLen = buffer.getInt();
-            byte[] vBytes = new byte[valLen];
-            buffer.get(vBytes);
-
-            keys.add(keySerializer.deserialize(kBytes));
-            values.add(valueSerializer.deserialize(vBytes));
+    public void delete(K key) {
+        int index = Collections.binarySearch(keys, key);
+        if (index < 0) {
+            return; // Key not found
         }
 
-        int nextNodeId = buffer.getInt();
-        if (nextNodeId != -1) {
-            nextNode = new LeafNode<>(order, keySerializer, valueSerializer);
-            nextNode.pageId = nextNodeId;
-        } else {
-            nextNode = null;
-        }
-    }   
+        keys.remove(index);
+        values.remove(index);
 
-    private int findInsertPosition(K key) {
-        int left = 0;
-        int right = keys.size() - 1;
-
-        while (left <= right) {
-            int mid = (left + right) / 2;
-            int cmp = ((Comparable<K>) key).compareTo(keys.get(mid));
-            if (cmp > 0) {
-                left = mid + 1;
-            } else {
-                right = mid - 1;
-            }
+        if (parent != null && isUnderflow()) {
+            parent.handleUnderflow(this, key);
         }
-        return left;
+    }
+
+    @Override
+    public K getFirstKey() {
+        return keys.isEmpty() ? null : keys.get(0);
+    }
+
+    // Called by parent to give this node a key from a sibling
+    void borrowFromLeft(LeafNode<K, V> leftSibling, K parentKey) {
+        K borrowedKey = leftSibling.keys.remove(leftSibling.keyCount() - 1);
+        V borrowedValue = leftSibling.values.remove(leftSibling.keyCount());
+        this.keys.add(0, borrowedKey);
+        this.values.add(0, borrowedValue);
+        parent.updateKey(parentKey, borrowedKey);
+    }
+
+    void borrowFromRight(LeafNode<K, V> rightSibling, K parentKey) {
+        K borrowedKey = rightSibling.keys.remove(0);
+        V borrowedValue = rightSibling.values.remove(0);
+        this.keys.add(borrowedKey);
+        this.values.add(borrowedValue);
+        parent.updateKey(parentKey, rightSibling.getFirstKey());
+    }
+
+    // Called by parent to merge this node with a sibling
+    void mergeWithLeft(LeafNode<K, V> leftSibling, K parentKey) {
+        leftSibling.keys.addAll(this.keys);
+        leftSibling.values.addAll(this.values);
+        leftSibling.nextNode = this.nextNode;
+        parent.removeChild(parentKey, this);
+    }
+
+    void mergeWithRight(LeafNode<K, V> rightSibling, K parentKey) {
+        this.keys.addAll(rightSibling.keys);
+        this.values.addAll(rightSibling.values);
+        this.nextNode = rightSibling.nextNode;
+        parent.removeChild(parentKey, rightSibling);
     }
 }
