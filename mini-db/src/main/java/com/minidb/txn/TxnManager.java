@@ -17,11 +17,13 @@ public class TxnManager {
     private AtomicLong txnId;
     private WALManager walManager;
     private ConcurrentHashMap<Long, Transaction> activeTransactions;
+    private LockTable lockTable;
 
     public TxnManager(WALManager walManager) {
         this.txnId = new AtomicLong(1);
         this.walManager = walManager;
         this.activeTransactions = new ConcurrentHashMap<>();
+        this.lockTable = new LockTable();
     }
 
     public long beginTransaction() {
@@ -32,6 +34,8 @@ public class TxnManager {
         return txnId;
     }
 
+    public boolean acquireSharedLock(long txnId, long resourceId) {
+        
     public void commitTransaction(long txnId) {
         Transaction txn = activeTransactions.get(txnId);
         if (txn != null) {
