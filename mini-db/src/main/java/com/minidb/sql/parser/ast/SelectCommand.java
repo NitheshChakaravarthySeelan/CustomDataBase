@@ -1,37 +1,34 @@
 package com.minidb.sql.parser.ast;
 
 public class SelectCommand implements Command {
-    public final String table;
-    public final String column;
-    public final String predicateColumn;
-    public final String predicateValue;
+    private final String tableName;
+    private final String column;
+    private final Predicate predicate;
 
-    public SelectCommand(String table, String column, String predicateColumn, String predicateValue) {
-        this.table = table;
+    public SelectCommand(String tableName, String column, Predicate predicate) {
+        this.tableName = tableName;
         this.column = column;
-        this.predicateColumn = predicateColumn;
-        this.predicateValue = predicateValue;
+        this.predicate = predicate;
     }
 
-    public String getTableString() {
-        return table;
+    public String getTableName() {
+        return tableName;
     }
 
-    public String getColumnString() {
+    public String getColumn() {
         return column;
-    }   
+    }
 
     public Predicate getPredicate() {
-        return new EqualsPredicate(predicateColumn, predicateValue);
+        return predicate;
     }
 
     @Override
-    public String toString() {  
-        return "SelectCommand{" +
-                "table='" + table + '\'' +
-                ", column='" + column + '\'' +
-                ", predicateColumn='" + predicateColumn + '\'' +
-                ", predicateValue='" + predicateValue + '\'' +
-                '}';
+    public String toString() {
+        return "SelectCommand{"
+                + "tableName='" + tableName + "'"
+                + ", column='" + column + "'"
+                + ", predicate=" + predicate
+                + "}";
     }
 }

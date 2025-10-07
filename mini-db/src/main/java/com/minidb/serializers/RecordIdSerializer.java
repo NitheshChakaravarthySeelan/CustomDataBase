@@ -13,4 +13,9 @@ public class RecordIdSerializer implements Serializer<RecordId> {
     public RecordId deserialize(byte[] data) {
         return RecordId.deserialize(data);
     }
+
+    @Override
+    public int getSerializedSize(RecordId obj) {
+        return RecordId.getSerializedSize();
+    }
 }

@@ -103,10 +103,15 @@ public class LeafNode<K extends Comparable<K>, V> extends Node<K, V> {
         parent.removeChild(parentKey, this);
     }
 
-    void mergeWithRight(LeafNode<K, V> rightSibling, K parentKey) {
+    public void mergeWithRight(LeafNode<K, V> rightSibling, K parentKey) {
         this.keys.addAll(rightSibling.keys);
         this.values.addAll(rightSibling.values);
         this.nextNode = rightSibling.nextNode;
         parent.removeChild(parentKey, rightSibling);
+    }
+
+    @Override
+    public void deserialize(byte[] data) {
+        // Implementation depends on the serialization format
     }
 }

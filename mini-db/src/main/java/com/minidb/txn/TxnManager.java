@@ -17,38 +17,35 @@ public class TxnManager {
     private AtomicLong txnId;
     private WALManager walManager;
     private ConcurrentHashMap<Long, Transaction> activeTransactions;
-    private LockTable lockTable;
+    private LockManager lockManager;
 
-    public TxnManager(WALManager walManager) {
+    public TxnManager(LockManager lockManager, WALManager walManager) {
         this.txnId = new AtomicLong(1);
         this.walManager = walManager;
         this.activeTransactions = new ConcurrentHashMap<>();
-        this.lockTable = new LockTable();
+        this.lockManager = lockManager;
     }
 
-    public long beginTransaction() {
+    public Transaction begin() {
         long txnId = this.txnId.getAndIncrement();
         Transaction txn = new Transaction(txnId, -1); // LSN will be set when the first log record is written
         txn.begin();
         activeTransactions.put(txnId, txn);
-        return txnId;
+        return txn;
     }
 
-    public boolean acquireSharedLock(long txnId, long resourceId) {
-        
-    public void commitTransaction(long txnId) {
-        Transaction txn = activeTransactions.get(txnId);
+    public void commit(Transaction txn) {
         if (txn != null) {
-            txn.commit();
-            activeTransactions.remove(txnId);
+activeTransactions.remove(txn.getTxnId());
+            lockManager.releaseAll(txn);
         }
     }
 
-    public void abortTransaction(long txnId) {
-        Transaction txn = activeTransactions.get(txnId);
+    public void abort(Transaction txn) {
         if (txn != null) {
             txn.abort();
-            activeTransactions.remove(txnId);
+            activeTransactions.remove(txn.getTxnId());
+            lockManager.releaseAll(txn);
         }
     }
 

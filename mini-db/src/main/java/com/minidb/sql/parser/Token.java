@@ -2,7 +2,6 @@ package com.minidb.sql.parser;
 
 import com.minidb.sql.parser.Tokenizer.TokenType;
 
-// Token.java
 public class Token {
     public final TokenType type;
     public final String value;
@@ -19,4 +18,3 @@ public class Token {
         return type + "(" + value + ")";
     }
 }
-

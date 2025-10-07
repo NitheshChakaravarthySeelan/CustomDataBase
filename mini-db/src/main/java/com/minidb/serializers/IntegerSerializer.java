@@ -16,4 +16,9 @@ public class IntegerSerializer implements Serializer<Integer> {
         ByteBuffer buffer = ByteBuffer.wrap(data);
         return buffer.getInt();
     }
+
+    @Override
+    public int getSerializedSize(Integer obj) {
+        return 4;
+    }
 }

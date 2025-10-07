@@ -74,28 +74,40 @@ public final class LogRecord {
     }
 
     public static LogRecord deserialize(ByteBuffer buffer) {
+        if (buffer.remaining() < 4) {
+            return null;
+        }
+        buffer.mark();
         int recordLen = buffer.getInt();
         if (buffer.remaining() < recordLen + 8) {
+            buffer.reset();
             return null; // Not enough data for a full record
         }
 
-        long lsn = buffer.getLong();
-        byte type = buffer.get();
-        long txId = buffer.getLong();
+        // Read payload
+        byte[] payload = new byte[recordLen];
+        buffer.get(payload);
+        
+        // Read checksum
+        long checksum = buffer.getLong();
 
-        int keyLen = buffer.getInt();
+        // Now parse the payload
+        ByteBuffer payloadBuffer = ByteBuffer.wrap(payload);
+        long lsn = payloadBuffer.getLong();
+        byte type = payloadBuffer.get();
+        long txId = payloadBuffer.getLong();
+
+        int keyLen = payloadBuffer.getInt();
         byte[] key = new byte[keyLen];
         if (keyLen > 0) {
-            buffer.get(key);
+            payloadBuffer.get(key);
         }
 
-        int valueLen = buffer.getInt();
+        int valueLen = payloadBuffer.getInt();
         byte[] value = new byte[valueLen];
         if (valueLen > 0) {
-            buffer.get(value);
+            payloadBuffer.get(value);
         }
-        
-        long checksum = buffer.getLong();
 
         return new LogRecord(recordLen, lsn, type, txId, key, value, checksum);
     }

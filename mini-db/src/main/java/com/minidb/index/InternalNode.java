@@ -190,4 +190,9 @@ public class InternalNode<K extends Comparable<K>, V> extends Node<K, V> {
         rightSibling.children.forEach(c -> c.parent = this);
         parent.removeChild(parentKey, rightSibling);
     }
+
+    @Override
+    public void deserialize(byte[] data) {
+        // Implementation depends on the serialization format
+    }
 }

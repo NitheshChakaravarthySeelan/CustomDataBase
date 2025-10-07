@@ -1,17 +1,24 @@
 package com.minidb;
 
 import com.minidb.index.BPlusTree;
+import com.minidb.index.Serializer;
 import com.minidb.log.RecoveryManager;
 import com.minidb.log.WALManager;
-import com.minidb.serializers.IntegerSerializer;
-import com.minidb.serializers.RecordIdSerializer;
-import com.minidb.storage.*;
-import com.minidb.storage.RecordsSerializer.Column;
-import com.minidb.storage.RecordsSerializer.ColumnType;
-import com.minidb.storage.RecordsSerializer.Row;
+import com.minidb.serializers.StringSerializer;
+import com.minidb.sql.executor.Executor;
+import com.minidb.sql.executor.Result;
+import com.minidb.sql.parser.Parser;
+import com.minidb.sql.parser.Token;
+import com.minidb.sql.parser.Tokenizer;
+import com.minidb.storage.BufferPool;
+import com.minidb.storage.PageManager;
+import com.minidb.txn.LockManager;
+import com.minidb.txn.TxnManager;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
+import java.util.Scanner;
 
 public class MiniDb {
 
@@ -21,57 +28,53 @@ public class MiniDb {
             dbDir.mkdir();
         }
 
-        // 1. Define the table schema
-        Column[] columns = new Column[2];
-        columns[0] = new Column();
-        columns[0].name = "id";
-        columns[0].type = ColumnType.INT;
-        columns[1] = new Column();
-        columns[1].name = "name";
-        columns[1].type = ColumnType.STRING;
-
-        // 2. Initialize managers and index
+        // Initialize managers and index
         PageManager pageManager = new PageManager(new File(dbDir, "minidb.db").getPath(), 4096);
         BufferPool bufferPool = new BufferPool(pageManager, 10);
-        RecordsSerializer serializer = new RecordsSerializer(columns);
         WALManager walManager = new WALManager(dbDir);
-        BPlusTree<Integer, RecordId> index = new BPlusTree<>(5, new IntegerSerializer(), new RecordIdSerializer());
-        RecordStorage recordStorage = new RecordStorage(bufferPool, serializer, walManager, index);
+        Serializer<String> serializer = new StringSerializer();
+        BPlusTree<String, String> index = new BPlusTree<>(5, serializer, serializer);
+        LockManager lockManager = new LockManager();
+        TxnManager txnManager = new TxnManager(lockManager, walManager);
 
-        // 3. Recover from WAL
-        RecoveryManager recoveryManager = new RecoveryManager(walManager, recordStorage);
-        recoveryManager.recover();
+        // Recover from WAL
+        // RecoveryManager recoveryManager = new RecoveryManager(walManager, null);
+        // recoveryManager.recover();
 
-        // 4. Insert some records
-        System.out.println("Inserting records...");
-        for (int i = 1; i <= 10; i++) {
-            Row r = new Row(2);
-            r.values[0] = i;
-            r.values[1] = "value_" + i;
-            recordStorage.insertRecord(r);
-            System.out.println("Inserted: " + i);
+        Executor executor = new Executor(txnManager, walManager, index, lockManager, serializer);
+
+        System.out.println("MiniDB SQL REPL. Enter .exit to quit.");
+        Scanner scanner = new Scanner(System.in);
+        while (true) {
+            System.out.print("> ");
+            String line = scanner.nextLine();
+            if (".exit".equalsIgnoreCase(line)) {
+                break;
+            }
+            if (line.trim().isEmpty()) {
+                continue;
+            }
+
+            try {
+                Tokenizer tokenizer = new Tokenizer(line);
+                List<Token> tokens = tokenizer.tokenize();
+                Parser parser = new Parser(tokens);
+                Result result = executor.execute(parser.parse());
+                if (result.ok) {
+                    if (result.rows != null && !result.rows.isEmpty()) {
+                        result.rows.forEach(row -> System.out.println(row.key + " -> " + row.value));
+                    } else {
+                        System.out.println("OK");
+                    }
+                } else {
+                    System.err.println("Error: " + result.errorMessage);
+                }
+            } catch (Exception e) {
+                System.err.println("Error: " + e.getMessage());
+            }
         }
 
-        // 5. Fetch a record using the index
-        System.out.println("\nFetching record with ID 7...");
-        Row fetchedRow = recordStorage.fetchRecord(7);
-        if (fetchedRow != null) {
-            System.out.println("Fetched record: id = " + fetchedRow.values[0] + ", name = " + fetchedRow.values[1]);
-        } else {
-            System.out.println("Record with ID 7 not found.");
-        }
-
-        // 6. Delete a record
-        System.out.println("\nDeleting record with ID 7...");
-        recordStorage.deleteRecord(7);
-        Row deletedRow = recordStorage.fetchRecord(7);
-        if (deletedRow == null) {
-            System.out.println("Successfully deleted record with ID 7.");
-        } else {
-            System.out.println("Deletion failed.");
-        }
-
-        // 7. Clean up
+        // Clean up
         System.out.println("\nFlushing pages and closing DB...");
         bufferPool.flushAllPages();
         walManager.close();

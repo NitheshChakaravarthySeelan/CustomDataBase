@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class WALManager implements Closeable {
@@ -13,6 +15,7 @@ public class WALManager implements Closeable {
     private final File walFile;
     private final FileChannel channel;
     private final AtomicLong nextLsn = new AtomicLong(1);
+    private final List<WALListener> listeners = new ArrayList<>();
 
     public WALManager(File walDir) throws IOException {
         this.walFile = new File(walDir, "wal-000000000000.log");
@@ -24,44 +27,39 @@ public class WALManager implements Closeable {
         }
     }
 
+    public synchronized void registerListener(WALListener listener) {
+        listeners.add(listener);
+    }
+
     private void recoverNextLsn() throws IOException {
         channel.position(0);
-        ByteBuffer sizeBuffer = ByteBuffer.allocate(4);
+        ByteBuffer buffer = ByteBuffer.allocate(4096);
         long maxLsn = 0;
 
-        while (channel.read(sizeBuffer) == 4) {
-            sizeBuffer.flip();
-            int recordSize = sizeBuffer.getInt();
-            sizeBuffer.clear();
-
-            if (recordSize <= 0 || channel.position() + recordSize + 8 > channel.size()) {
-                // Truncate corrupt tail
-                channel.truncate(channel.position() - 4);
-                break;
+        while (channel.read(buffer) > 0) {
+            buffer.flip();
+            while (buffer.hasRemaining()) {
+                LogRecord record = LogRecord.deserialize(buffer);
+                if (record != null && record.isValid()) {
+                    maxLsn = Math.max(maxLsn, record.getLsn());
+                } else {
+                    // Truncate corrupt tail
+                    channel.truncate(channel.position() - buffer.remaining());
+                    nextLsn.set(maxLsn + 1);
+                    return;
+                }
             }
-
-            ByteBuffer recordBuffer = ByteBuffer.allocate(recordSize + 8);
-            channel.read(recordBuffer);
-            recordBuffer.flip();
-            LogRecord record = LogRecord.deserialize(recordBuffer);
-
-            if (record != null && record.isValid()) {
-                maxLsn = Math.max(maxLsn, record.getLsn());
-            } else {
-                // Truncate corrupt tail
-                channel.truncate(channel.position() - recordSize - 8 - 4);
-                break;
-            }
+            buffer.clear();
         }
         nextLsn.set(maxLsn + 1);
     }
 
-    public synchronized long append(LogRecord r) throws IOException {
+    public synchronized LogRecord append(LogRecord r) throws IOException {
         long lsn = nextLsn.getAndIncrement();
         LogRecord recordWithLsn = new LogRecord(lsn, r.getType(), 0, r.getKey(), r.getValue());
         byte[] serialized = recordWithLsn.serialize();
         channel.write(ByteBuffer.wrap(serialized));
-        return lsn;
+        return recordWithLsn;
     }
 
     public synchronized void flush() throws IOException {
@@ -71,13 +69,36 @@ public class WALManager implements Closeable {
     }
 
     public synchronized long appendAndFlush(LogRecord r) throws IOException {
-        long lsn = append(r);
+        LogRecord recordWithLsn = append(r);
         flush();
-        return lsn;
+        for (WALListener listener : listeners) {
+            listener.onNewRecord(recordWithLsn);
+        }
+        return recordWithLsn.getLsn();
+    }
+
+    public synchronized void appendPredefined(LogRecord record) throws IOException {
+        byte[] serialized = record.serialize();
+        channel.write(ByteBuffer.wrap(serialized));
+        // Ensure nextLsn is always ahead
+        nextLsn.set(Math.max(nextLsn.get(), record.getLsn() + 1));
+    }
+
+    public synchronized void appendPredefinedAndFlush(LogRecord record) throws IOException {
+        appendPredefined(record);
+        flush();
     }
 
     public FileChannel getChannelForRecovery() throws IOException {
         return new RandomAccessFile(walFile, "r").getChannel();
+    }
+
+    public long getNextLsn() {
+        return nextLsn.get();
+    }
+
+    public File getWalDir() {
+        return walFile.getParentFile();
     }
 
     @Override

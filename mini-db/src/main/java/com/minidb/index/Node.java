@@ -3,11 +3,15 @@ package com.minidb.index;
 import java.util.List;
 
 public abstract class Node<K extends Comparable<K>, V> {
+    public int pageId;
     protected final int order;
     protected final List<K> keys;
     protected final Serializer<K> keySerializer;
     protected final Serializer<V> valueSerializer;
     protected InternalNode<K, V> parent;
+
+    public abstract void deserialize(byte[] data);
+
 
     public Node(int order, List<K> keys, Serializer<K> keySerializer, Serializer<V> valueSerializer) {
         this.order = order;

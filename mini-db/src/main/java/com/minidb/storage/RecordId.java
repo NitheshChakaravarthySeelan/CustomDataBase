@@ -32,4 +32,8 @@ public class RecordId {
         int slotId = bb.getInt();
         return new RecordId(pageId, slotId);
     }
+
+    public static int getSerializedSize() {
+        return 8;
+    }
 }

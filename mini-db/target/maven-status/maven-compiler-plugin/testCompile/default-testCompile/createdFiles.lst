@@ -1,0 +1,5 @@
+com/minidb/SqlTests.class
+com/minidb/AppTest.class
+com/minidb/replication/ReplicationFlowTest.class
+com/minidb/replication/LagAndResyncTest.class
+com/minidb/replication/SlaveRecoveryTest.class

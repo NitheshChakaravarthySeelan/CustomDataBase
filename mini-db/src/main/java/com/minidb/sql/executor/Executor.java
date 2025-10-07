@@ -1,35 +1,33 @@
 package com.minidb.sql.executor;
 
+import com.minidb.index.BPlusTree;
+import com.minidb.index.Serializer;
+import com.minidb.log.LogRecord;
+import com.minidb.log.WALManager;
+import com.minidb.sql.parser.ast.*;
+import com.minidb.txn.LockManager;
+import com.minidb.txn.Transaction;
+import com.minidb.txn.TxnManager;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-
-import com.minidb.index.BPlusTree;
-import com.minidb.index.Serializer;
-import com.minidb.log.WALManager;
-import com.minidb.sql.parser.ast.Command;
-import com.minidb.sql.parser.ast.DeleteCommand;
-import com.minidb.sql.parser.ast.InsertCommand;
-import com.minidb.sql.parser.ast.Predicate;
-import com.minidb.sql.parser.ast.SelectCommand;
-import com.minidb.txn.LockTable;
-import com.minidb.txn.Transaction;
-import com.minidb.txn.TxnManager;
+import java.util.stream.Collectors;
 
 public class Executor {
     private TxnManager txnManager;
     private WALManager walManager;
-    private BPlusTree<String, String> bPlusTree;
-    private LockTable lockTable;
+    private BPlusTree<String, String> bpt;
+    private LockManager lockManager;
     private Serializer<String> serializer;
 
     private static final long LOCK_WAIT_MS = TimeUnit.SECONDS.toMillis(10);
 
-    public Executor(TxnManager txnManager, WALManager walManager, BPlusTree<String, String> bPlusTree, LockTable lockTable, Serializer<String> serializer) {
+    public Executor(TxnManager txnManager, WALManager walManager, BPlusTree<String, String> bPlusTree, LockManager lockManager, Serializer<String> serializer) {
         this.txnManager = txnManager;
         this.walManager = walManager;
-        this.bPlusTree = bPlusTree;
-        this.lockTable = lockTable;
+        this.bpt = bPlusTree;
+        this.lockManager = lockManager;
         this.serializer = serializer;
     }
 
@@ -42,51 +40,40 @@ public class Executor {
             } else if (cmd instanceof DeleteCommand) {
                 return executeDelete((DeleteCommand) cmd);
             }
+            return Result.error("Unsupported command type");
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
         }
     }
-    
+
     private Result executeSelect(SelectCommand cmd) {
-        // validate table
-        if (!"kv".equalsIgnoreCase(cmd.getTableString())) {
-            return Result.error("Unknown table: " + cmd.getTableString());
+        if (!"kv".equalsIgnoreCase(cmd.getTableName())) {
+            return Result.error("Unknown table: " + cmd.getTableName());
         }
 
         Predicate pred = cmd.getPredicate();
+        Transaction dummy = txnManager.begin();
         try {
             if (pred instanceof EqualsPredicate) {
                 String key = ((EqualsPredicate) pred).getValue();
-                // Acquire shared lock at key-level (read-committed semantics: release after read)
                 ResourceId rid = ResourceId.key(cmd.getTableName(), key);
-                Transaction dummy = txnManager.begin(); // optional, used purely for lock ownership
-                try {
-                    lockManager.acquireShared(dummy, rid, LOCK_WAIT_MS);
-                    Optional<String> valOpt = bpt.search(key);
-                    lockManager.releaseAll(dummy);
-                    if (valOpt.isPresent()) {
-                        var row = new Pair<String,String>(key, valOpt.get());
-                        return Result.ok(List.of(row));
-                    } else {
-                        return Result.ok(List.of()); // empty result
-                    }
-                } finally {
-                    lockManager.releaseAll(dummy);
+                lockManager.acquireShared(dummy, rid, LOCK_WAIT_MS);
+                Optional<String> valOpt = Optional.ofNullable(bpt.search(key));
+                if (valOpt.isPresent()) {
+                    var row = new Pair<String, String>(key, valOpt.get());
+                    return Result.ok(List.of(row));
+                } else {
+                    return Result.ok(List.of());
                 }
 
             } else if (pred instanceof BetweenPredicate) {
                 BetweenPredicate bp = (BetweenPredicate) pred;
                 String low = bp.getLow();
                 String high = bp.getHigh();
-                // For range scan, we take a table-level shared lock for simplicity
-                Transaction dummy = txnManager.begin();
                 ResourceId tableRid = ResourceId.table(cmd.getTableName());
-                try {
-                    lockManager.acquireShared(dummy, tableRid, LOCK_WAIT_MS);
-                    List<Pair<String,String>> rows = bpt.rangeSearch(low, high);
-                    lockManager.releaseAll(dummy);
-                    return Result.ok(rows);
-                } finally {
-                    lockManager.releaseAll(dummy);
-                }
+                lockManager.acquireShared(dummy, tableRid, LOCK_WAIT_MS);
+                List<Pair<String, String>> rows = bpt.rangeSearch(low, high).stream().map(entry -> new Pair<>(entry.getKey(), entry.getValue())).collect(Collectors.toList());
+                return Result.ok(rows);
             } else {
                 return Result.error("Unsupported predicate type");
             }
@@ -95,12 +82,10 @@ public class Executor {
             return Result.error("Interrupted while acquiring lock");
         } catch (Exception e) {
             return Result.error("Select failed: " + e.getMessage());
+        } finally {
+            lockManager.releaseAll(dummy);
         }
     }
-
-    /* ---------------------------
-       INSERT implementation (auto-commit)
-       --------------------------- */
 
     private Result executeInsert(InsertCommand cmd) {
         if (!"kv".equalsIgnoreCase(cmd.getTableName())) {
@@ -111,91 +96,56 @@ public class Executor {
         ResourceId rid = ResourceId.key(cmd.getTableName(), cmd.getKeyLiteral());
 
         try {
-            // 1) acquire exclusive lock on key
             lockManager.acquireExclusive(tx, rid, LOCK_WAIT_MS);
-
-            // 2) read before-image (if any)
-            Optional<String> beforeOpt = bpt.search(cmd.getKeyLiteral());
-
-            // 3) build and append WAL record (PUT)
             byte[] keyBytes = serializer.serialize(cmd.getKeyLiteral());
             byte[] valueBytes = serializer.serialize(cmd.getValueLiteral());
-            LogRecord putRec = new LogRecord(0L, LogRecord.OP_PUT, tx.getId(), keyBytes, valueBytes);
-            long lsn = walManager.append(putRec); // assign LSN
-            // Optionally: store lsn into page later when applying (page-level code)
-
-            // 4) apply the change to the index/storage
+            LogRecord putRec = new LogRecord(0L, LogRecord.OP_PUT, tx.getTxnId(), keyBytes, valueBytes);
+            walManager.append(putRec);
             bpt.insert(cmd.getKeyLiteral(), cmd.getValueLiteral());
-
-            // 5) commit: write commit record and flush WAL
-            LogRecord commitRec = new LogRecord(0L, LogRecord.OP_DONE, tx.getId(), null, null);
+            LogRecord commitRec = new LogRecord(0L, LogRecord.OP_DONE, tx.getTxnId(), null, null);
             walManager.appendAndFlush(commitRec);
-
-            // 6) let txn manager mark commit and release locks
             txnManager.commit(tx);
-            lockManager.releaseAll(tx);
-
             return Result.ok();
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            safeAbort(tx);
-            return Result.error("Interrupted while acquiring lock");
         } catch (Exception e) {
             safeAbort(tx);
             return Result.error("Insert failed: " + e.getMessage());
         } finally {
-            // ensure locks released
             lockManager.releaseAll(tx);
         }
     }
-
-    /* ---------------------------
-       DELETE implementation (auto-commit)
-       --------------------------- */
 
     private Result executeDelete(DeleteCommand cmd) {
         if (!"kv".equalsIgnoreCase(cmd.getTableName())) {
             return Result.error("Unknown table: " + cmd.getTableName());
         }
+        if (!(cmd.getPredicate() instanceof EqualsPredicate)) {
+            return Result.error("Delete only supports equals predicate");
+        }
+        String key = ((EqualsPredicate) cmd.getPredicate()).getValue();
 
         Transaction tx = txnManager.begin();
-        ResourceId rid = ResourceId.key(cmd.getTableName(), cmd.getKeyLiteral());
+        ResourceId rid = ResourceId.key(cmd.getTableName(), key);
 
         try {
-            // 1) acquire exclusive lock on key
             lockManager.acquireExclusive(tx, rid, LOCK_WAIT_MS);
-
-            // 2) read before-image (must exist)
-            Optional<String> beforeOpt = bpt.search(cmd.getKeyLiteral());
+            Optional<String> beforeOpt = Optional.ofNullable(bpt.search(key));
             if (beforeOpt.isEmpty()) {
                 safeAbort(tx);
-                return Result.error("Key not found: " + cmd.getKeyLiteral());
+                return Result.error("Key not found: " + key);
             }
 
-            // 3) append delete record to WAL
-            byte[] keyBytes = serializer.serialize(cmd.getKeyLiteral());
-            LogRecord delRec = new LogRecord(0L, LogRecord.OP_DELETE, tx.getId(), keyBytes, null);
-            long lsn = walManager.append(delRec);
+            byte[] keyBytes = serializer.serialize(key);
+            LogRecord delRec = new LogRecord(0L, LogRecord.OP_DELETE, tx.getTxnId(), keyBytes, null);
+            walManager.append(delRec);
 
-            // 4) apply deletion to storage
-            boolean deleted = bpt.delete(cmd.getKeyLiteral());
-            if (!deleted) {
-                safeAbort(tx);
-                return Result.error("Delete failed for key: " + cmd.getKeyLiteral());
-            }
+            bpt.delete(key);
 
-            // 5) commit (append + flush commit)
-            LogRecord commitRec = new LogRecord(0L, LogRecord.OP_DONE, tx.getId(), null, null);
+            LogRecord commitRec = new LogRecord(0L, LogRecord.OP_DONE, tx.getTxnId(), null, null);
             walManager.appendAndFlush(commitRec);
 
             txnManager.commit(tx);
-            lockManager.releaseAll(tx);
             return Result.ok();
 
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            safeAbort(tx);
-            return Result.error("Interrupted while acquiring lock");
         } catch (Exception e) {
             safeAbort(tx);
             return Result.error("Delete failed: " + e.getMessage());
@@ -208,12 +158,7 @@ public class Executor {
         try {
             txnManager.abort(tx);
         } catch (Exception e) {
-            // best-effort: log; we can't throw from here
-            System.err.println("Failed to abort tx " + (tx == null ? "null" : tx.getId()) + ": " + e.getMessage());
-        } finally {
-            if (tx != null) lockManager.releaseAll(tx);
+            System.err.println("Failed to abort tx " + (tx == null ? "null" : tx.getTxnId()) + ": " + e.getMessage());
         }
     }
 }
-
-

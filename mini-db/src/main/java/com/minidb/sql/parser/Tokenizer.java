@@ -2,23 +2,28 @@ package com.minidb.sql.parser;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
-/*
- * Walk input char by char
- * Skip whitespace and comments
- * If char is a letter, read an alpha-numeric token and norm, if it matches a keywork (case insensitive) return keyword token else identifier
- * If char is ': read until matching ', supporting doubled single quotes as excape
- * If char is a digit read number literal 
- * Single char tokens map directly 
- */
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 public class Tokenizer {
 
     public enum TokenType {
-        KEYWORD, IDENTIFIER, OPERATOR, LITERAL, EOF
+        KEYWORD, IDENTIFIER, STRING_LITERAL, NUMERIC_LITERAL, SYMBOL, EOF
     }
-    public enum Keyword {
-        INSERT, INTO, VALUES, SELECT, FROM, WHERE, DELETE, BETWEEN, AND
-    }
+
+    private static final Map<String, TokenType> KEYWORDS = Stream.of(new Object[][] {
+        {"INSERT", TokenType.KEYWORD}, {"INTO", TokenType.KEYWORD}, {"VALUES", TokenType.KEYWORD},
+        {"SELECT", TokenType.KEYWORD}, {"FROM", TokenType.KEYWORD}, {"WHERE", TokenType.KEYWORD},
+        {"DELETE", TokenType.KEYWORD}, {"BETWEEN", TokenType.KEYWORD}, {"AND", TokenType.KEYWORD}
+    }).collect(Collectors.toMap(data -> (String)data[0], data -> (TokenType)data[1]));
+
+    private static final Map<Character, TokenType> SYMBOLS = Stream.of(new Object[][] {
+        {'(', TokenType.SYMBOL}, {')', TokenType.SYMBOL}, {',', TokenType.SYMBOL},
+        {';', TokenType.SYMBOL}, {'=', TokenType.SYMBOL}, {'*', TokenType.SYMBOL}
+    }).collect(Collectors.toMap(data -> (Character)data[0], data -> (TokenType)data[1]));
+
     public String input = "";
     private int pos;
 
@@ -27,7 +32,7 @@ public class Tokenizer {
         this.pos = 0;
     }
 
-    public List<Token> tokenize() {
+    public List<Token> tokenize() throws ParseException {
         List<Token> tokens = new ArrayList<>();
         while (pos < input.length()) {
             char c = input.charAt(pos);
@@ -35,46 +40,72 @@ public class Tokenizer {
                 pos++;
                 continue;
             }
-            if (c == '/' && pos + 1 < input.length() && input.charAt(pos + 1) == '/') {
-                pos = readComment();
+            if (c == '-' && pos + 1 < input.length() && input.charAt(pos + 1) == '-') {
+                readComment();
                 continue;
             }
             if (Character.isLetter(c)) {
                 tokens.add(readIdentifierOrKeyword());
                 continue;
             }
-            if (c == '\'' || c == '"') {
-                tokens.add(new Token(TokenType.LITERAL, readString(c), pos));
+            if (c == '\'') {
+                tokens.add(readStringLiteral());
                 continue;
             }
             if (Character.isDigit(c)) {
-                tokens.add(new Token(TokenType.LITERAL, readNumberLiteral(), pos));
+                tokens.add(readNumericLiteral());
                 continue;
             }
-            tokens.add(new Token(TokenType.OPERATOR, String.valueOf(c), pos));
-            pos++;
+            if (SYMBOLS.containsKey(c)) {
+                tokens.add(new Token(SYMBOLS.get(c), String.valueOf(c), pos++));
+                continue;
+            }
+            throw new ParseException("Unexpected character: " + c + " at position " + pos);
         }
         tokens.add(new Token(TokenType.EOF, "", pos));
         return tokens;
     }
-    private int readComment() {
+
+    private void readComment() {
         while (pos < input.length() && input.charAt(pos) != '\n') {
             pos++;
         }
-        return pos;
-    }   
+    }
 
     private Token readIdentifierOrKeyword() {
-        String identifier = readWhile(Character::isLetterOrDigit);
-        String keyword = identifier.toUpperCase();
-        if (Keyword.valueOf(keyword) != null) {
-            return new Token(TokenType.KEYWORD, keyword, pos);
+        int start = pos;
+        String identifier = readWhile(c -> Character.isLetterOrDigit(c) || c == '_');
+        String upperCaseIdentifier = identifier.toUpperCase();
+        if (KEYWORDS.containsKey(upperCaseIdentifier)) {
+            return new Token(KEYWORDS.get(upperCaseIdentifier), upperCaseIdentifier, start);
         }
-        return new Token(TokenType.IDENTIFIER, identifier, pos);
+        return new Token(TokenType.IDENTIFIER, identifier, start);
+    }
+
+    private Token readStringLiteral() throws ParseException {
+        int start = pos;
+        pos++; // Skip opening quote
+        StringBuilder sb = new StringBuilder();
+        while (pos < input.length() && input.charAt(pos) != '\'') {
+            if (input.charAt(pos) == '\'' && pos + 1 < input.length() && input.charAt(pos + 1) == '\'') {
+                sb.append('\'');
+                pos += 2;
+            } else {
+                sb.append(input.charAt(pos));
+                pos++;
+            }
+        }
+        if (pos >= input.length() || input.charAt(pos) != '\'') {
+            throw new ParseException("Unclosed string literal starting at position " + start);
+        }
+        pos++; // Skip closing quote
+        return new Token(TokenType.STRING_LITERAL, sb.toString(), start);
     }
     
-    private String readNumberLiteral() {
-        return readWhile(Character::isDigit);
+    private Token readNumericLiteral() {
+        int start = pos;
+        String number = readWhile(Character::isDigit);
+        return new Token(TokenType.NUMERIC_LITERAL, number, start);
     }
 
     private String readWhile(Predicate<Character> predicate){
@@ -84,19 +115,4 @@ public class Tokenizer {
         }
         return input.substring(start, pos);
     }
-
-    private String readString(char quote) {
-        pos++;
-        int start = pos;
-        while (pos < input.length() && input.charAt(pos) != quote) {
-            pos++;
-        }
-        if (pos >= input.length()) {
-            throw new RuntimeException("Unterminated string literal");
-        }
-        pos++;
-        return input.substring(start, pos);
-
-    }
-
 }

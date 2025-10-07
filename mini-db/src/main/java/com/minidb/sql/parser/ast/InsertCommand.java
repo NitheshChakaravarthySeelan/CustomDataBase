@@ -1,34 +1,33 @@
 package com.minidb.sql.parser.ast;
 
-public class InsertCommand implements Command{
-    public final String table;
-    public final String key;
-    public final String value;
+public class InsertCommand implements Command {
+    private final String tableName;
+    private final String keyLiteral;
+    private final String valueLiteral;
 
-
-    public InsertCommand(String table, String key, String value) {
-        this.table = table;
-        this.key = key;
-        this.value = value;
+    public InsertCommand(String tableName, String keyLiteral, String valueLiteral) {
+        this.tableName = tableName;
+        this.keyLiteral = keyLiteral;
+        this.valueLiteral = valueLiteral;
     }
 
     public String getTableName() {
-        return table;
+        return tableName;
     }
 
-    public String getKey() {
-        return key;
+    public String getKeyLiteral() {
+        return keyLiteral;
     }
 
-    public String getValue() {
-        return value;}
+    public String getValueLiteral() {
+        return valueLiteral;
+    }
 
-    @Override
-    public String toString() {
+public String toString() {
         return "InsertCommand{" +
-                "table='" + table + '\'' +
-                ", key='" + key + '\'' +
-                ", value='" + value + '\'' +
+                "tableName='" + tableName + '\'' +
+                ", keyLiteral='" + keyLiteral + '\'' +
+                ", valueLiteral='" + valueLiteral + '\'' +
                 '}';
-    }  
+    }
 }

@@ -1,8 +1,7 @@
 package com.minidb.sql.parser;
 
-public class ParseException {
+public class ParseException extends Exception {
     public ParseException(String message) {
-        throw new RuntimeException(message);
+        super(message);
     }
 }
-
