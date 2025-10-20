@@ -1,9 +1,5 @@
 package com.minidb.sql.executor;
 
-import com.minidb.index.BPlusTree;
-import com.minidb.index.Serializer;
-import com.minidb.log.LogRecord;
-import com.minidb.log.WALManager;
 import com.minidb.sql.parser.ast.*;
 import com.minidb.txn.LockManager;
 import com.minidb.txn.Transaction;
@@ -16,19 +12,15 @@ import java.util.stream.Collectors;
 
 public class Executor {
     private TxnManager txnManager;
-    private WALManager walManager;
-    private BPlusTree<String, String> bpt;
     private LockManager lockManager;
-    private Serializer<String> serializer;
+    private com.minidb.storage.RecordStorage recordStorage;
 
     private static final long LOCK_WAIT_MS = TimeUnit.SECONDS.toMillis(10);
 
-    public Executor(TxnManager txnManager, WALManager walManager, BPlusTree<String, String> bPlusTree, LockManager lockManager, Serializer<String> serializer) {
+    public Executor(TxnManager txnManager, com.minidb.log.WALManager walManager, LockManager lockManager, com.minidb.storage.RecordStorage recordStorage) {
         this.txnManager = txnManager;
-        this.walManager = walManager;
-        this.bpt = bPlusTree;
         this.lockManager = lockManager;
-        this.serializer = serializer;
+        this.recordStorage = recordStorage;
     }
 
     public Result execute(Command cmd) {
@@ -58,22 +50,15 @@ public class Executor {
                 String key = ((EqualsPredicate) pred).getValue();
                 ResourceId rid = ResourceId.key(cmd.getTableName(), key);
                 lockManager.acquireShared(dummy, rid, LOCK_WAIT_MS);
-                Optional<String> valOpt = Optional.ofNullable(bpt.search(key));
-                if (valOpt.isPresent()) {
-                    var row = new Pair<String, String>(key, valOpt.get());
-                    return Result.ok(List.of(row));
+                com.minidb.storage.RecordsSerializer.Row row = recordStorage.fetchRecord(Integer.parseInt(key));
+                if (row != null) {
+                    return Result.ok(List.of(new Pair<>(row.values[0].toString(), row.values[1].toString())));
                 } else {
                     return Result.ok(List.of());
                 }
 
             } else if (pred instanceof BetweenPredicate) {
-                BetweenPredicate bp = (BetweenPredicate) pred;
-                String low = bp.getLow();
-                String high = bp.getHigh();
-                ResourceId tableRid = ResourceId.table(cmd.getTableName());
-                lockManager.acquireShared(dummy, tableRid, LOCK_WAIT_MS);
-                List<Pair<String, String>> rows = bpt.rangeSearch(low, high).stream().map(entry -> new Pair<>(entry.getKey(), entry.getValue())).collect(Collectors.toList());
-                return Result.ok(rows);
+                return Result.error("Range scans not supported yet");
             } else {
                 return Result.error("Unsupported predicate type");
             }
@@ -97,13 +82,10 @@ public class Executor {
 
         try {
             lockManager.acquireExclusive(tx, rid, LOCK_WAIT_MS);
-            byte[] keyBytes = serializer.serialize(cmd.getKeyLiteral());
-            byte[] valueBytes = serializer.serialize(cmd.getValueLiteral());
-            LogRecord putRec = new LogRecord(0L, LogRecord.OP_PUT, tx.getTxnId(), keyBytes, valueBytes);
-            walManager.append(putRec);
-            bpt.insert(cmd.getKeyLiteral(), cmd.getValueLiteral());
-            LogRecord commitRec = new LogRecord(0L, LogRecord.OP_DONE, tx.getTxnId(), null, null);
-            walManager.appendAndFlush(commitRec);
+            com.minidb.storage.RecordsSerializer.Row row = new com.minidb.storage.RecordsSerializer.Row(2);
+            row.values[0] = Integer.parseInt(cmd.getKeyLiteral());
+            row.values[1] = cmd.getValueLiteral();
+            recordStorage.insertRecord(row, tx);
             txnManager.commit(tx);
             return Result.ok();
         } catch (Exception e) {
@@ -128,21 +110,7 @@ public class Executor {
 
         try {
             lockManager.acquireExclusive(tx, rid, LOCK_WAIT_MS);
-            Optional<String> beforeOpt = Optional.ofNullable(bpt.search(key));
-            if (beforeOpt.isEmpty()) {
-                safeAbort(tx);
-                return Result.error("Key not found: " + key);
-            }
-
-            byte[] keyBytes = serializer.serialize(key);
-            LogRecord delRec = new LogRecord(0L, LogRecord.OP_DELETE, tx.getTxnId(), keyBytes, null);
-            walManager.append(delRec);
-
-            bpt.delete(key);
-
-            LogRecord commitRec = new LogRecord(0L, LogRecord.OP_DONE, tx.getTxnId(), null, null);
-            walManager.appendAndFlush(commitRec);
-
+            recordStorage.deleteRecord(Integer.parseInt(key), tx);
             txnManager.commit(tx);
             return Result.ok();
 

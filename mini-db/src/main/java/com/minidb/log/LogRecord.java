@@ -158,4 +158,8 @@ public final class LogRecord {
     public byte[] getValue() {
         return value;
     }
+
+    public long getTxId() {
+        return txId;
+    }
 }

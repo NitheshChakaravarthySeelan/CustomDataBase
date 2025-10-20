@@ -22,8 +22,6 @@ import java.util.concurrent.Executors;
  * Master-side coordinator; streams WAL entries to slaves.
  */
 public class Replicator implements WALListener, AutoCloseable {
-
-    private final WALManager walManager;
     private final LogStreamer logStreamer;
     private final Map<String, ReplicationState> slaves = new ConcurrentHashMap<>();
     private final ExecutorService replicationExecutor = Executors.newCachedThreadPool();
@@ -31,6 +29,7 @@ public class Replicator implements WALListener, AutoCloseable {
     private ServerSocket serverSocket;
     private volatile boolean isRunning = true;
     private volatile LogRecord lastReceivedRecord = null;
+    private final WALManager walManager;
 
     public Replicator(WALManager walManager, int port) {
         this.walManager = walManager;

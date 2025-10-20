@@ -49,7 +49,7 @@ public class Parser {
         expectSymbol(")");
         expectKeyword("VALUES");
         expectSymbol("(");
-        String key = expectStringLiteral();
+        String key = expectLiteral();
         expectSymbol(",");
         String value = expectStringLiteral();
         expectSymbol(")");
@@ -80,13 +80,13 @@ public class Parser {
     private Predicate parsePredicate() throws ParseException {
         String column = expectIdentifier();
         if (matchKeyword("BETWEEN")) {
-            String low = expectStringLiteral();
+            String low = expectLiteral();
             expectKeyword("AND");
-            String high = expectStringLiteral();
+            String high = expectLiteral();
             return new BetweenPredicate(column, low, high);
         } else {
             expectSymbol("=");
-            String value = expectStringLiteral();
+            String value = expectLiteral();
             return new EqualsPredicate(column, value);
         }
     }
@@ -126,6 +126,14 @@ public class Parser {
         Token t = consume();
         if (t.type != TokenType.STRING_LITERAL) {
             throw new ParseException("Expected a string literal but got " + t.value);
+        }
+        return t.value;
+    }
+
+    private String expectLiteral() throws ParseException {
+        Token t = consume();
+        if (t.type != TokenType.STRING_LITERAL && t.type != TokenType.NUMERIC_LITERAL) {
+            throw new ParseException("Expected a string or numeric literal but got " + t.value);
         }
         return t.value;
     }

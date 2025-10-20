@@ -10,8 +10,8 @@ public class RecordIdSerializer implements Serializer<RecordId> {
     }
 
     @Override
-    public RecordId deserialize(byte[] data) {
-        return RecordId.deserialize(data);
+    public RecordId deserialize(byte[] bytes) {
+        return RecordId.deserialize(bytes);
     }
 
     @Override

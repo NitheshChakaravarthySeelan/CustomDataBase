@@ -1,5 +1,9 @@
 package com.minidb.index;
 
+import com.minidb.storage.BufferPool;
+import com.minidb.storage.Page;
+
+import java.io.IOException;
 import java.util.List;
 
 public abstract class Node<K extends Comparable<K>, V> {
@@ -9,15 +13,19 @@ public abstract class Node<K extends Comparable<K>, V> {
     protected final Serializer<K> keySerializer;
     protected final Serializer<V> valueSerializer;
     protected InternalNode<K, V> parent;
+    protected final BufferPool bufferPool;
 
     public abstract void deserialize(byte[] data);
+    public abstract byte[] serialize();
+    public abstract void writeNode() throws IOException;
+    public abstract void readNode() throws IOException;
 
-
-    public Node(int order, List<K> keys, Serializer<K> keySerializer, Serializer<V> valueSerializer) {
+    public Node(int order, List<K> keys, Serializer<K> keySerializer, Serializer<V> valueSerializer, BufferPool bufferPool) {
         this.order = order;
         this.keys = keys;
         this.keySerializer = keySerializer;
         this.valueSerializer = valueSerializer;
+        this.bufferPool = bufferPool;
     }
 
     public int keyCount() {
@@ -28,9 +36,8 @@ public abstract class Node<K extends Comparable<K>, V> {
 
     public abstract V search(K key);
 
-    public abstract SplitResult<K, ? extends Node<K, V>> insert(K key, V value);
-
-    public abstract void delete(K key);
+    public abstract SplitResult<K, ? extends Node<K, V>> insert(K key, V value) throws IOException;
+        public abstract void delete(K key) throws IOException;
 
     public abstract K getFirstKey();
 
@@ -52,5 +59,10 @@ public abstract class Node<K extends Comparable<K>, V> {
         }
         public K getSplitKey() { return splitKey; }
         public N getRightNode() { return rightNode; }
+    }
+
+    // Temporary debug method
+    public void debugInsert(K key, V value) {
+        System.out.println("Node.debugInsert: This should not be called directly.");
     }
 }

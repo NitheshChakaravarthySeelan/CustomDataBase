@@ -30,6 +30,13 @@ public class RecordsSerializer {
         ColumnType type;
         int maxLength;
         boolean nullable;
+
+        public Column(String name, ColumnType type) {
+            this.name = name;
+            this.type = type;
+            this.maxLength = 0; // Default or calculate based on type
+            this.nullable = true; // Default or configurable
+        }
     }
 
     public enum ColumnType {

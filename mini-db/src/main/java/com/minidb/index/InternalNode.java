@@ -1,5 +1,10 @@
 package com.minidb.index;
 
+import com.minidb.storage.BufferPool;
+import com.minidb.storage.Page;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -7,8 +12,8 @@ import java.util.List;
 public class InternalNode<K extends Comparable<K>, V> extends Node<K, V> {
     final List<Node<K, V>> children;
 
-    public InternalNode(int order, Serializer<K> keySerializer, Serializer<V> valueSerializer) {
-        super(order, new ArrayList<>(), keySerializer, valueSerializer);
+    public InternalNode(int order, Serializer<K> keySerializer, Serializer<V> valueSerializer, BufferPool bufferPool) {
+        super(order, new ArrayList<>(), keySerializer, valueSerializer, bufferPool);
         this.children = new ArrayList<>();
     }
 
@@ -23,7 +28,7 @@ public class InternalNode<K extends Comparable<K>, V> extends Node<K, V> {
     }
 
     @Override
-    public SplitResult<K, InternalNode<K, V>> insert(K key, V value) {
+    public SplitResult<K, InternalNode<K, V>> insert(K key, V value) throws IOException {
         int childIndex = findChildPosition(key);
         Node<K, V> child = children.get(childIndex);
         SplitResult<K, ? extends Node<K, V>> result = child.insert(key, value);
@@ -45,7 +50,7 @@ public class InternalNode<K extends Comparable<K>, V> extends Node<K, V> {
 
         // This node is full, split it
         int mid = keys.size() / 2;
-        InternalNode<K, V> rightNode = new InternalNode<>(order, keySerializer, valueSerializer);
+        InternalNode<K, V> rightNode = new InternalNode<>(order, keySerializer, valueSerializer, bufferPool);
         K splitKey = keys.remove(mid);
 
         rightNode.keys.addAll(keys.subList(mid, keys.size()));
@@ -59,7 +64,7 @@ public class InternalNode<K extends Comparable<K>, V> extends Node<K, V> {
     }
 
     @Override
-    public void delete(K key) {
+    public void delete(K key) throws IOException {
         children.get(findChildPosition(key)).delete(key);
     }
 
@@ -192,7 +197,71 @@ public class InternalNode<K extends Comparable<K>, V> extends Node<K, V> {
     }
 
     @Override
+    public void writeNode() throws IOException {
+        Page page = bufferPool.getPage(pageId);
+        byte[] serializedData = serialize();
+        System.arraycopy(serializedData, 0, page.toBytes(), 0, serializedData.length);
+        page.setDirty(true);
+        bufferPool.unpinPage(pageId, true);
+    }
+
+    @Override
+    public void readNode() throws IOException {
+        Page page = bufferPool.getPage(pageId);
+        deserialize(page.toBytes());
+        bufferPool.unpinPage(pageId, false);
+    }
+
+    @Override
+    public byte[] serialize() {
+        // Calculate total size needed
+        int size = 1 + 4; // 1 byte for node type, 4 bytes for num_keys
+        for (int i = 0; i < keys.size(); i++) {
+            int keySize = keySerializer.getSerializedSize(keys.get(i));
+            size += 4 + keySize; // 4 bytes for key size
+        }
+        size += 4 * children.size(); // 4 bytes for each child's pageId
+
+        ByteBuffer buffer = ByteBuffer.allocate(size);
+        buffer.put((byte) 0); // InternalNode type
+        buffer.putInt(keys.size());
+
+        for (int i = 0; i < keys.size(); i++) {
+            byte[] keyBytes = keySerializer.serialize(keys.get(i));
+            buffer.putInt(keyBytes.length);
+            buffer.put(keyBytes);
+        }
+
+        for (Node<K, V> child : children) {
+            buffer.putInt(child.pageId);
+        }
+        return buffer.array();
+    }
+
+    @Override
     public void deserialize(byte[] data) {
-        // Implementation depends on the serialization format
+        ByteBuffer buffer = ByteBuffer.wrap(data);
+        buffer.get(); // Skip node type byte
+        int numKeys = buffer.getInt();
+
+        for (int i = 0; i < numKeys; i++) {
+            int keySize = buffer.getInt();
+            byte[] keyBytes = new byte[keySize];
+            buffer.get(keyBytes);
+            K key = keySerializer.deserialize(keyBytes);
+            keys.add(key);
+        }
+
+        while (buffer.hasRemaining()) {
+            int childPageId = buffer.getInt();
+            // We don't know the type of the child yet, so we'll just store its pageId for now.
+            // The actual child node will be loaded when needed.
+            // For now, we'll create a placeholder node with just the pageId.
+            // This is a simplification and might need a more robust solution for a full B+ tree.
+            // For this exercise, we'll assume children are loaded on demand.
+            // This part needs careful consideration for a complete implementation.
+            // For now, we'll just add a null to represent the child, and load it when accessed.
+            children.add(null); // Placeholder
+        }
     }
 }

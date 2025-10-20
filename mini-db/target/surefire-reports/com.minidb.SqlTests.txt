@@ -1,4 +1,8 @@
 -------------------------------------------------------------------------------
 Test set: com.minidb.SqlTests
 -------------------------------------------------------------------------------
-Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.052 s - in com.minidb.SqlTests
+Tests run: 2, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.135 s <<< FAILURE! - in com.minidb.SqlTests
+testInsertAndSelect(com.minidb.SqlTests)  Time elapsed: 0.108 s  <<< FAILURE!
+java.lang.AssertionError: expected:<1> but was:<0>
+	at com.minidb.SqlTests.testInsertAndSelect(SqlTests.java:57)
+

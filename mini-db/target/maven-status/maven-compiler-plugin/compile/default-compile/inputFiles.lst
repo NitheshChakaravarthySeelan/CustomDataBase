@@ -1,53 +1,71 @@
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/LogReceiver.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/index/LeafNode.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/executor/ResourceId.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/Tokenizer.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ParseException.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/log/WALListener.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/BetweenRange.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/index/BPlusTree.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/txn/LockTable.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/RecordStorage.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/Replicator.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/SlaveNode.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/serializers/IntegerSerializer.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/serializers/StringSerializer.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/MiniDb.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/executor/Executor.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/executor/Pair.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/txn/TxnManager.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/ReplicationState.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/PageHeader.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/serializers/RecordIdSerializer.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/InsertCommand.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/txn/Transaction.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/index/NodeFactory.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/transport/ProtocolException.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/BufferPool.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/Command.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/Page.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/Predicate.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/transport/Message.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/LogStreamer.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/BetweenPredicate.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/Token.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/index/Serializer.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/EqualsPredicate.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/RecordsSerializer.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/txn/LockManager.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/SelectCommand.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/index/InternalNode.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/log/WALManager.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/SyncProtocol.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/transport/SocketChannel.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/index/Node.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/DeleteCommand.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/SlotEntry.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/executor/Result.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/log/LogRecord.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/PageManager.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/Parser.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/log/RecoveryManager.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/SlotDirectory.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/RecordId.java
-/media/nithesh/New Volume/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/transport/TcpSocketChannel.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/MiniDbRepl.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/serializers/IntegerSerializer.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/AppendEntriesRequest.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/RaftStorage.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/DeleteCommand.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/serializers/RecordIdSerializer.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/NotLeaderException.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/log/LogRecord.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/Parser.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/LogEntry.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ParseException.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/index/BPlusTree.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/executor/Pair.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/Role.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/index/InternalNode.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/transport/ProtocolException.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/executor/ResourceId.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/BetweenPredicate.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/Page.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/Token.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/log/WALManager.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/Leader.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/RequestVoteRequest.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/index/LeafNode.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/RequestVoteResponse.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/txn/Transaction.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/RecordStorage.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/SlotEntry.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/DbComponents.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/LogReceiver.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/ReplicationState.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/RaftReplicator.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/InsertCommand.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/SelectCommand.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/RaftNode.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/AppendEntriesResponse.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/SlotDirectory.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/index/Node.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/RaftApi.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/Tokenizer.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/executor/Executor.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/serializers/StringSerializer.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/transport/Message.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/BufferPool.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/SyncProtocol.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/RecordsSerializer.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/executor/Result.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/Candidate.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/InMemoryRaftProtocol.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/LogStreamer.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/RaftProtocol.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/index/NodeFactory.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/log/WALListener.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/PageHeader.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/raft/Follower.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/EqualsPredicate.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/Predicate.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/txn/LockTable.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/txn/LockManager.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/RecordId.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/Replicator.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/SlaveNode.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/storage/PageManager.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/Command.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/log/RecoveryManager.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/transport/SocketChannel.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/txn/TxnManager.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/index/Serializer.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/MiniDb.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/sql/parser/ast/BetweenRange.java
+/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/main/java/com/minidb/replication/transport/TcpSocketChannel.java

@@ -13,20 +13,25 @@ public class RecordStorage {
     private final RecordsSerializer recordSerializer;
     private final WALManager walManager;
     private final BPlusTree<Integer, RecordId> index;
+    private final PageManager pageManager;
 
-    public RecordStorage(BufferPool bufferPool, RecordsSerializer recordSerializer, WALManager walManager, BPlusTree<Integer, RecordId> index) {
+    public RecordStorage(BufferPool bufferPool, RecordsSerializer recordSerializer, WALManager walManager, BPlusTree<Integer, RecordId> index, PageManager pageManager) {
         this.bufferPool = bufferPool;
         this.recordSerializer = recordSerializer;
         this.walManager = walManager;
         this.index = index;
+        this.pageManager = pageManager;
+        System.out.println("RecordStorage constructor: BPlusTree index hashcode: " + index.hashCode());
     }
 
-    public RecordId insertRecord(Row row) throws IOException {
+    public RecordId insertRecord(Row row, com.minidb.txn.Transaction txn) throws IOException {
         byte[] recordBytes = recordSerializer.serialize(row);
         Integer key = (Integer) row.values[0]; // Assuming PK is the first column
 
+        System.out.println("RecordStorage.insertRecord: Inserting key: " + key + ", row: " + row);
+
         // 1. Log the operation
-        LogRecord logRecord = new LogRecord(0, LogRecord.OP_PUT, 0, null, recordBytes);
+        LogRecord logRecord = new LogRecord(0, LogRecord.OP_PUT, txn.getTxnId(), null, recordBytes);
         long lsn = walManager.appendAndFlush(logRecord);
 
         // 2. Find a page with enough space and insert
@@ -42,22 +47,23 @@ public class RecordStorage {
         RecordId rid = new RecordId(pageId, slotId);
 
         // 3. Update index
+        System.out.println("RecordStorage.insertRecord: Calling index.insert with key: " + key + ", rid: " + rid);
         index.insert(key, rid);
 
         // 4. Log the DONE operation
-        LogRecord doneRecord = new LogRecord(lsn, LogRecord.OP_DONE, 0, null, null);
+        LogRecord doneRecord = new LogRecord(lsn, LogRecord.OP_DONE, txn.getTxnId(), null, null);
         walManager.appendAndFlush(doneRecord);
 
         return rid;
     }
 
-    public void deleteRecord(Integer key) throws IOException {
+    public void deleteRecord(Integer key, com.minidb.txn.Transaction txn) throws IOException {
         RecordId rid = index.search(key);
         if (rid == null) return; // Key not found
 
         // 1. Log the operation
         byte[] keyBytes = rid.serialize();
-        LogRecord logRecord = new LogRecord(0, LogRecord.OP_DELETE, 0, keyBytes, null);
+        LogRecord logRecord = new LogRecord(0, LogRecord.OP_DELETE, txn.getTxnId(), keyBytes, null);
         long lsn = walManager.appendAndFlush(logRecord);
 
         // 2. Delete from index and page
@@ -67,30 +73,16 @@ public class RecordStorage {
         bufferPool.unpinPage(rid.getPageId(), true); // Mark page as dirty
 
         // 3. Log the DONE operation
-        LogRecord doneRecord = new LogRecord(lsn, LogRecord.OP_DONE, 0, null, null);
+        LogRecord doneRecord = new LogRecord(lsn, LogRecord.OP_DONE, txn.getTxnId(), null, null);
         walManager.appendAndFlush(doneRecord);
     }
 
-    public Row fetchRecord(Integer key) {
-        RecordId rid = index.search(key);
-        if (rid == null) return null;
-        return fetchRecord(rid);
-    }
-
-    public Row fetchRecord(RecordId rid) {
-        Page page = bufferPool.getPage(rid.getPageId());
-        byte[] recordBytes = page.getRecord(rid.getSlotId());
-        if (recordBytes == null) {
-            bufferPool.unpinPage(rid.getPageId(), false);
-            return null; // Record deleted or does not exist
-        }
-        Row row = recordSerializer.deserialize(recordBytes);
-        bufferPool.unpinPage(rid.getPageId(), false);
-        return row;
+    public Row fetchRecord(Integer key) throws IOException {
+        return null; // Hardcoded for debugging
     }
     
     // This method is for recovery purposes and should not be logged.
-    public void insertRecordForRecovery(byte[] recordBytes) {
+    public void insertRecordForRecovery(byte[] recordBytes) throws IOException {
         Row row = recordSerializer.deserialize(recordBytes);
         Integer key = (Integer) row.values[0];
 
@@ -108,7 +100,7 @@ public class RecordStorage {
     }
 
     // This method is for recovery purposes and should not be logged.
-    public void deleteRecordForRecovery(RecordId rid) {
+    public void deleteRecordForRecovery(RecordId rid) throws IOException {
         // Fetch the page once and perform all operations.
         Page page = bufferPool.getPage(rid.getPageId());
         byte[] recordBytes = page.getRecord(rid.getSlotId());

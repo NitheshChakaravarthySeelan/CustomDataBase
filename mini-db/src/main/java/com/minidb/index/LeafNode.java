@@ -1,16 +1,44 @@
 package com.minidb.index;
 
+import com.minidb.index.Node.SplitResult;
+import com.minidb.storage.BufferPool;
+import com.minidb.storage.Page;
+import com.minidb.storage.PageManager;
+import com.minidb.storage.RecordId;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 public class LeafNode<K extends Comparable<K>, V> extends Node<K, V> {
     final List<V> values;
     LeafNode<K, V> nextNode;
 
-    public LeafNode(int order, Serializer<K> keySerializer, Serializer<V> valueSerializer) {
-        super(order, new ArrayList<>(), keySerializer, valueSerializer);
+    public LeafNode(int order, Serializer<K> keySerializer, Serializer<V> valueSerializer, BufferPool bufferPool) {
+        super(order, new ArrayList<>(), keySerializer, valueSerializer, bufferPool);
         this.values = new ArrayList<>();
+    }
+
+    @Override
+    public void writeNode() throws IOException {
+        Page page = bufferPool.getPage(pageId);
+        byte[] serializedData = serialize();
+        System.arraycopy(serializedData, 0, page.toBytes(), 0, serializedData.length);
+        page.setDirty(true);
+        bufferPool.unpinPage(pageId, true);
+    }
+
+    @Override
+    public void readNode() throws IOException {
+        Page page = bufferPool.getPage(pageId);
+        deserialize(page.toBytes());
+        bufferPool.unpinPage(pageId, false);
     }
 
     @Override
@@ -20,13 +48,14 @@ public class LeafNode<K extends Comparable<K>, V> extends Node<K, V> {
 
     @Override
     public V search(K key) {
-        int index = Collections.binarySearch(keys, key);
+        int index = Collections.binarySearch(keys, key, Comparator.naturalOrder());
         return index >= 0 ? values.get(index) : null;
     }
 
     @Override
     public SplitResult<K, LeafNode<K, V>> insert(K key, V value) {
-        int index = Collections.binarySearch(keys, key);
+        System.out.println("LeafNode.insert: This hashcode: " + this.hashCode());
+        int index = Collections.binarySearch(keys, key, Comparator.naturalOrder());
         int insertionPoint = (index >= 0) ? index : -index - 1;
 
         if (index >= 0) { // Key exists, update value
@@ -42,7 +71,7 @@ public class LeafNode<K extends Comparable<K>, V> extends Node<K, V> {
 
         // Split the node
         int mid = keys.size() / 2;
-        LeafNode<K, V> rightNode = new LeafNode<>(order, keySerializer, valueSerializer);
+        LeafNode<K, V> rightNode = new LeafNode<>(order, keySerializer, valueSerializer, bufferPool);
 
         rightNode.keys.addAll(keys.subList(mid, keys.size()));
         rightNode.values.addAll(values.subList(mid, values.size()));
@@ -60,7 +89,7 @@ public class LeafNode<K extends Comparable<K>, V> extends Node<K, V> {
 
     @Override
     public void delete(K key) {
-        int index = Collections.binarySearch(keys, key);
+        int index = Collections.binarySearch(keys, key, Comparator.naturalOrder());
         if (index < 0) {
             return; // Key not found
         }
@@ -112,6 +141,47 @@ public class LeafNode<K extends Comparable<K>, V> extends Node<K, V> {
 
     @Override
     public void deserialize(byte[] data) {
-        // Implementation depends on the serialization format
+        ByteBuffer buffer = ByteBuffer.wrap(data);
+        buffer.get(); // Skip node type byte
+        int numKeys = buffer.getInt();
+
+        for (int i = 0; i < numKeys; i++) {
+            int keySize = buffer.getInt();
+            byte[] keyBytes = new byte[keySize];
+            buffer.get(keyBytes);
+            K key = keySerializer.deserialize(keyBytes);
+            keys.add(key);
+
+            int valueSize = buffer.getInt();
+            byte[] valueBytes = new byte[valueSize];
+            buffer.get(valueBytes);
+            V value = valueSerializer.deserialize(valueBytes);
+            values.add(value);
+        }
+    }
+
+    public byte[] serialize() {
+        // Calculate total size needed
+        int size = 1 + 4; // 1 byte for node type, 4 bytes for num_keys
+        for (int i = 0; i < keys.size(); i++) {
+            int keySize = keySerializer.getSerializedSize(keys.get(i));
+            int valueSize = valueSerializer.getSerializedSize(values.get(i));
+            size += 4 + keySize; // 4 bytes for key size
+            size += 4 + valueSize; // 4 bytes for value size
+        }
+
+        ByteBuffer buffer = ByteBuffer.allocate(size);
+        buffer.put((byte) 1); // LeafNode type
+        buffer.putInt(keys.size());
+
+        for (int i = 0; i < keys.size(); i++) {
+            byte[] keyBytes = keySerializer.serialize(keys.get(i));
+            byte[] valueBytes = valueSerializer.serialize(values.get(i));
+            buffer.putInt(keyBytes.length);
+            buffer.put(keyBytes);
+            buffer.putInt(valueBytes.length);
+            buffer.put(valueBytes);
+        }
+        return buffer.array();
     }
 }

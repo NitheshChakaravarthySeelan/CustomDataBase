@@ -55,14 +55,17 @@ public class RecoveryManager {
 
         // 2. Redo completed operations
         for (long lsn : doneLsns) {
-            LogRecord recordToRedo = records.get(lsn);
-            if (recordToRedo != null) {
-                redo(recordToRedo);
+            LogRecord doneRecord = records.get(lsn);
+            if (doneRecord != null && doneRecord.getType() == LogRecord.OP_DONE) {
+                LogRecord originalRecord = records.get(doneRecord.getLsn());
+                if (originalRecord != null) {
+                    redo(originalRecord);
+                }
             }
         }
     }
 
-    private void redo(LogRecord record) {
+    private void redo(LogRecord record) throws IOException {
         switch (record.getType()) {
             case LogRecord.OP_PUT:
                 recordStorage.insertRecordForRecovery(record.getValue());

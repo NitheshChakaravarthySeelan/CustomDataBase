@@ -33,30 +33,49 @@ public class WALManager implements Closeable {
 
     private void recoverNextLsn() throws IOException {
         channel.position(0);
-        ByteBuffer buffer = ByteBuffer.allocate(4096);
         long maxLsn = 0;
 
-        while (channel.read(buffer) > 0) {
-            buffer.flip();
-            while (buffer.hasRemaining()) {
-                LogRecord record = LogRecord.deserialize(buffer);
-                if (record != null && record.isValid()) {
-                    maxLsn = Math.max(maxLsn, record.getLsn());
-                } else {
-                    // Truncate corrupt tail
-                    channel.truncate(channel.position() - buffer.remaining());
-                    nextLsn.set(maxLsn + 1);
-                    return;
-                }
+        while (true) {
+            ByteBuffer sizeBuffer = ByteBuffer.allocate(4);
+            if (channel.read(sizeBuffer) != 4) {
+                break; // End of file or not enough bytes for size
             }
-            buffer.clear();
+            sizeBuffer.flip();
+            int recordSize = sizeBuffer.getInt();
+
+            if (recordSize <= 0 || channel.position() + recordSize + 8 > channel.size()) {
+                break; // Corrupt tail or incomplete record
+            }
+
+            ByteBuffer recordBuffer = ByteBuffer.allocate(recordSize + 8);
+            if (channel.read(recordBuffer) != recordSize + 8) {
+                break; // Incomplete record
+            }
+            recordBuffer.flip();
+
+            // Create a new buffer that includes the recordSize at the beginning
+            ByteBuffer fullRecordBuffer = ByteBuffer.allocate(4 + recordSize + 8);
+            fullRecordBuffer.putInt(recordSize);
+            fullRecordBuffer.put(recordBuffer);
+            fullRecordBuffer.flip();
+
+            LogRecord record = LogRecord.deserialize(fullRecordBuffer);
+
+            if (record != null && record.isValid()) {
+                maxLsn = Math.max(maxLsn, record.getLsn());
+            } else {
+                // Truncate corrupt tail
+                channel.truncate(channel.position() - (4 + recordSize + 8)); // Rewind to before the corrupt record
+                nextLsn.set(maxLsn + 1);
+                return;
+            }
         }
         nextLsn.set(maxLsn + 1);
     }
 
     public synchronized LogRecord append(LogRecord r) throws IOException {
         long lsn = nextLsn.getAndIncrement();
-        LogRecord recordWithLsn = new LogRecord(lsn, r.getType(), 0, r.getKey(), r.getValue());
+        LogRecord recordWithLsn = new LogRecord(lsn, r.getType(), r.getTxId(), r.getKey(), r.getValue());
         byte[] serialized = recordWithLsn.serialize();
         channel.write(ByteBuffer.wrap(serialized));
         return recordWithLsn;
