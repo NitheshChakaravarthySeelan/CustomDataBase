@@ -2,6 +2,7 @@ com/minidb/sql/parser/ast/BetweenRange.class
 com/minidb/replication/LogReceiver.class
 com/minidb/replication/LogStreamer.class
 com/minidb/replication/SlaveNode$1.class
+com/minidb/monitoring/MetricsRegistry.class
 com/minidb/sql/parser/Tokenizer.class
 com/minidb/MiniDbRepl.class
 com/minidb/replication/transport/ProtocolException.class
@@ -13,6 +14,7 @@ com/minidb/raft/Candidate.class
 com/minidb/log/LogRecord.class
 com/minidb/replication/SyncProtocol.class
 com/minidb/sql/parser/ast/InsertCommand.class
+com/minidb/MiniDb.class
 com/minidb/index/LeafNode.class
 com/minidb/storage/RecordsSerializer.class
 com/minidb/index/InternalNode.class
@@ -51,6 +53,7 @@ com/minidb/raft/InMemoryRaftProtocol.class
 com/minidb/replication/Replicator.class
 com/minidb/storage/SlotEntry.class
 com/minidb/raft/RaftNode.class
+com/minidb/MiniDbConfig.class
 com/minidb/log/WALListener.class
 com/minidb/raft/RaftProtocol.class
 com/minidb/DbComponents.class
@@ -63,7 +66,6 @@ com/minidb/sql/executor/ResourceId.class
 com/minidb/sql/parser/ast/DeleteCommand.class
 com/minidb/txn/Transaction$Status.class
 com/minidb/sql/parser/Token.class
-MiniDb.class
 com/minidb/replication/transport/Message.class
 com/minidb/storage/SlotDirectory.class
 com/minidb/raft/AppendEntriesRequest.class

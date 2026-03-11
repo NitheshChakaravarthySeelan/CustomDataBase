@@ -1,14 +1,21 @@
 package com.minidb.storage;
 
+import com.minidb.monitoring.MetricsRegistry;
+import io.micrometer.core.instrument.MeterRegistry;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class BufferPool {
 
     private final PageManager pageManager;
     private final int poolSize;
     private final Map<Integer, Page> pageCache;
+    private final AtomicInteger hitCount = new AtomicInteger(0);
+    private final AtomicInteger missCount = new AtomicInteger(0);
 
     public BufferPool(PageManager pageManager, int poolSize) {
         this.pageManager = pageManager;
@@ -35,15 +42,21 @@ public class BufferPool {
                 return false;
             }
         };
+
+        MeterRegistry meterRegistry = MetricsRegistry.getInstance();
+        meterRegistry.gauge("minidb.bufferpool.hits", hitCount);
+        meterRegistry.gauge("minidb.bufferpool.misses", missCount);
     }
 
     public Page getPage(int pageId) {
         if (pageCache.containsKey(pageId)) {
+            hitCount.incrementAndGet();
             Page page = pageCache.get(pageId);
             page.pin();
             return page;
         }
 
+        missCount.incrementAndGet();
         // Page not in cache, so read it from disk
         // Eviction of an old page happens automatically here if the pool is full,
         // thanks to the LinkedHashMap's removeEldestEntry override.
@@ -58,7 +71,7 @@ public class BufferPool {
 
         // Calculate maxSlots dynamically instead of hardcoding
         int maxSlots = (pageManager.getPageSize() - Page.HEADER_SIZE) / Page.SLOT_ENTRY_SIZE;
-        Page page = new Page(pageBytes, maxSlots);
+        Page page = new Page(pageId, pageBytes, maxSlots);
         pageCache.put(pageId, page);
         // The page is already pinned with a count of 1 upon creation/loading.
         return page;

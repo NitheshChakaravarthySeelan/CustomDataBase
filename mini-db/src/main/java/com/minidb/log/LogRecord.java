@@ -79,9 +79,9 @@ public final class LogRecord {
         }
         buffer.mark();
         int recordLen = buffer.getInt();
-        if (buffer.remaining() < recordLen + 8) {
+        if (recordLen < 25 || buffer.remaining() < recordLen + 8) {
             buffer.reset();
-            return null; // Not enough data for a full record
+            return null; // Not enough data or corrupt record
         }
 
         // Read payload

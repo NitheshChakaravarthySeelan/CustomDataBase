@@ -3,9 +3,9 @@ package com.minidb.storage;
 import java.nio.ByteBuffer;
 
 public class Page {
-    private final int PAGE_SIZE = 4096;
-    final static int HEADER_SIZE = 16;
-    final static int SLOT_ENTRY_SIZE = 12;
+    public final static int PAGE_SIZE = 4096;
+    public final static int HEADER_SIZE = 16;
+    public final static int SLOT_ENTRY_SIZE = 12;
     private final int maxSlots;
 
     private byte[] pageBuffer;
@@ -25,29 +25,42 @@ public class Page {
         toBytes(); 
     }
 
-    public Page(byte[] pageBytes, int maxSlots) {
+    public Page(int pageId, byte[] pageBytes, int maxSlots) {
         this.pageBuffer = pageBytes;
         this.maxSlots = maxSlots;
         this.pinCount = 1; // Pinned on load
 
         ByteBuffer headerBuffer = ByteBuffer.wrap(pageBytes, 0, HEADER_SIZE);
-        int pageId = headerBuffer.getInt();
+        int readPageId = headerBuffer.getInt();
         int numSlots = headerBuffer.getInt();
         int freePtr = headerBuffer.getInt();
+        byte pageType = headerBuffer.get();
 
-        header = new PageHeader(pageId, freePtr);
-        header.setNumSlots(numSlots);
+        // If the page is new (all zeros), we must initialize the header with the correct pageId.
+        if (readPageId == 0 && numSlots == 0 && freePtr == 0) {
+            header = new PageHeader(pageId, HEADER_SIZE);
+            header.setPageType((byte) 0);
+        } else {
+            header = new PageHeader(readPageId, freePtr);
+            header.setNumSlots(numSlots);
+            header.setPageType(pageType);
+        }
 
         slots = new SlotDirectory(maxSlots);
-        for (int i = 0; i < numSlots; i++) {
-            int slotOffset = PAGE_SIZE - ((i + 1) * SLOT_ENTRY_SIZE);
-            ByteBuffer slotBuffer = ByteBuffer.wrap(pageBytes, slotOffset, SLOT_ENTRY_SIZE);
-            int recordOffset = slotBuffer.getInt();
-            int recordLength = slotBuffer.getInt();
-            boolean valid = slotBuffer.get() != 0;
+        if (freePtr > 0 && header.getPageType() == 0) {
+            for (int i = 0; i < numSlots; i++) {
+                int slotOffset = PAGE_SIZE - ((i + 1) * SLOT_ENTRY_SIZE);
+                if (slotOffset < HEADER_SIZE || slotOffset + SLOT_ENTRY_SIZE > PAGE_SIZE) {
+                    break; // Invalid slot entry or corruption
+                }
+                ByteBuffer slotBuffer = ByteBuffer.wrap(pageBytes, slotOffset, SLOT_ENTRY_SIZE);
+                int recordOffset = slotBuffer.getInt();
+                int recordLength = slotBuffer.getInt();
+                boolean valid = slotBuffer.get() != 0;
 
-            if (valid) {
-                slots.addSlot(i, recordOffset, recordLength);
+                if (valid) {
+                    slots.addSlot(i, recordOffset, recordLength);
+                }
             }
         }
         this.dirty = false;
@@ -55,6 +68,14 @@ public class Page {
 
     public int getPageId() {
         return header.getPageId();
+    }
+
+    public byte getPageType() {
+        return header.getPageType();
+    }
+
+    public void setPageType(byte type) {
+        header.setPageType(type);
     }
 
     public int insertRecord(byte[] record) {
@@ -110,18 +131,21 @@ public class Page {
         buffer.putInt(0, header.getPageId());
         buffer.putInt(4, header.getNumSlots());
         buffer.putInt(8, header.getFreeSpacePtr());
+        buffer.put(12, header.getPageType());
 
-        for (int i = 0; i < maxSlots; i++) {
-            int pos = PAGE_SIZE - ((i + 1) * SLOT_ENTRY_SIZE);
-            SlotEntry slot = slots.get(i);
-            if (slot != null && slot.isValid()) {
-                buffer.putInt(pos, slot.getOffset());
-                buffer.putInt(pos + 4, slot.getLength());
-                buffer.put(pos + 8, (byte) 1);
-            } else {
-                buffer.putInt(pos, 0);
-                buffer.putInt(pos + 4, 0);
-                buffer.put(pos + 8, (byte) 0);
+        if (header.getPageType() == 0) { // Only write slots for data pages
+            for (int i = 0; i < maxSlots; i++) {
+                int pos = PAGE_SIZE - ((i + 1) * SLOT_ENTRY_SIZE);
+                SlotEntry slot = slots.get(i);
+                if (slot != null && slot.isValid()) {
+                    buffer.putInt(pos, slot.getOffset());
+                    buffer.putInt(pos + 4, slot.getLength());
+                    buffer.put(pos + 8, (byte) 1);
+                } else {
+                    buffer.putInt(pos, 0);
+                    buffer.putInt(pos + 4, 0);
+                    buffer.put(pos + 8, (byte) 0);
+                }
             }
         }
         return pageBuffer;

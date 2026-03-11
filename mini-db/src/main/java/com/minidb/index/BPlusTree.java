@@ -36,25 +36,19 @@ public class BPlusTree<K extends Comparable<K>, V> {
             Page page = bufferPool.getPage(1);
             byte[] data = page.toBytes();
             
-            // Check if the page is empty (all zeros) or contains valid data
-            boolean isEmptyPage = true;
-            for (byte b : data) {
-                if (b != 0) {
-                    isEmptyPage = false;
-                    break;
-                }
-            }
-
-            if (!isEmptyPage) {
-                // Determine node type and deserialize
-                byte nodeType = data[0];
-                if (nodeType == 0) { // InternalNode
+            // Check if the page is empty or valid via the header
+            if (page.getPageType() != 0) {
+                // Determine node type from PageHeader pageType
+                byte nodeType = page.getPageType();
+                if (nodeType == 2) { // InternalNode
                     this.root = nodeFactory.createInternalNode();
                 } else { // LeafNode
                     this.root = nodeFactory.createLeafNode();
                 }
                 this.root.pageId = 1;
-                this.root.deserialize(data);
+                byte[] nodeData = new byte[data.length - Page.HEADER_SIZE];
+                System.arraycopy(data, Page.HEADER_SIZE, nodeData, 0, nodeData.length);
+                this.root.deserialize(nodeData);
                 bufferPool.unpinPage(1, false);
             } else {
                 // No root page found, create a new LeafNode as root
@@ -77,15 +71,9 @@ public class BPlusTree<K extends Comparable<K>, V> {
     }
 
     public void insert(K key, V value) throws IOException {
-        System.out.println("BPlusTree.insert: Root hashcode: " + root.hashCode());
-        System.out.println("BPlusTree.insert: Root isLeaf(): " + root.isLeaf());
-        System.out.println("BPlusTree.insert: Inserting key: " + key + ", value: " + value);
         lock.writeLock().lock();
         try {
-        System.out.println("BPlusTree.insert: Root hashcode: " + root.hashCode());
-        System.out.println("BPlusTree.insert: Root hashcode: " + root.hashCode());
-            LeafNode<K, V> tempLeaf = nodeFactory.createLeafNode();
-            Node.SplitResult<K, ? extends Node<K, V>> result = tempLeaf.insert(key, value);
+            Node.SplitResult<K, ? extends Node<K, V>> result = root.insert(key, value);
             root.writeNode(); // Write the (potentially modified) root node
 
             if (result != null) {

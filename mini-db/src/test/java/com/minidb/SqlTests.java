@@ -13,6 +13,8 @@ import com.minidb.sql.parser.Tokenizer;
 import com.minidb.storage.*;
 import com.minidb.txn.LockManager;
 import com.minidb.txn.TxnManager;
+import com.minidb.monitoring.MetricsRegistry;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -25,20 +27,19 @@ import static org.junit.Assert.*;
 public class SqlTests {
 
     private Executor executor;
+    private File dbDir = new File("minidb_test_data");
+    private BufferPool bufferPool;
 
     @Before
     public void setup() throws IOException {
-        File dbDir = new File("minidb_test_data");
-        if (!dbDir.exists()) {
-            dbDir.mkdir();
-        }
+        deleteDirectory(dbDir);
+        dbDir.mkdir();
         PageManager pageManager = new PageManager(new File(dbDir, "minidb.db").getPath(), 4096);
-        BufferPool bufferPool = new BufferPool(pageManager, 10);
+        bufferPool = new BufferPool(pageManager, 10);
         WALManager walManager = new WALManager(dbDir);
         Serializer<Integer> keySerializer = new IntegerSerializer();
         Serializer<RecordId> valueSerializer = new RecordIdSerializer();
         BPlusTree<Integer, RecordId> index = new BPlusTree<>(5, keySerializer, valueSerializer, pageManager, bufferPool);
-        System.out.println("SqlTests.setup: BPlusTree index hashcode: " + index.hashCode());
         LockManager lockManager = new LockManager();
         TxnManager txnManager = new TxnManager(lockManager, walManager);
         RecordsSerializer recordsSerializer = new RecordsSerializer(new RecordsSerializer.Column[]{
@@ -47,6 +48,27 @@ public class SqlTests {
         });
         RecordStorage recordStorage = new RecordStorage(bufferPool, recordsSerializer, walManager, index, pageManager);
         executor = new Executor(txnManager, walManager, lockManager, recordStorage);
+    }
+
+    @After
+    public void cleanup() {
+        bufferPool.flushAllPages();
+        deleteDirectory(dbDir);
+    }
+
+    private void deleteDirectory(File directory) {
+        if (directory.exists()) {
+            File[] files = directory.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isDirectory()) {
+                        deleteDirectory(file);
+                    }
+                    file.delete();
+                }
+            }
+            directory.delete();
+        }
     }
 
     @Test

@@ -1,4 +1,6 @@
 
+package com.minidb;
+
 import com.minidb.index.BPlusTree;
 import com.minidb.index.Serializer;
 import com.minidb.log.RecoveryManager;
@@ -26,15 +28,17 @@ import com.minidb.MiniDbRepl;
 public class MiniDb {
 
     public static void main(String[] args) throws Exception {
-        if (args.length < 5) {
-            System.out.println("Usage: MiniDb <nodeId> <peerId1,peerId2,...> <bPlusTreeOrder> <bufferPoolSize> <pageSize>");
+        if (args.length < 2) {
+            System.out.println("Usage: minidb <nodeId> <peerId1,peerId2,...>");
             return;
         }
         String nodeId = args[0];
         List<String> peerIds = Arrays.asList(args[1].split(","));
-        int bPlusTreeOrder = Integer.parseInt(args[2]);
-        int bufferPoolSize = Integer.parseInt(args[3]);
-        int pageSize = Integer.parseInt(args[4]);
+        
+        MiniDbConfig config = new MiniDbConfig();
+        int bPlusTreeOrder = config.getBPlusTreeOrder();
+        int bufferPoolSize = config.getBufferPoolSize();
+        int pageSize = config.getPageSize();
 
         DbComponents components = initializeDbComponents(nodeId, peerIds, bPlusTreeOrder, bufferPoolSize, pageSize);
 

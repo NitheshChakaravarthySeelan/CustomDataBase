@@ -39,7 +39,8 @@ public class RecoveryManager {
                     break; // Corrupt tail
                 }
 
-                ByteBuffer recordBuffer = ByteBuffer.allocate(recordSize + 8);
+                ByteBuffer recordBuffer = ByteBuffer.allocate(4 + recordSize + 8);
+                recordBuffer.putInt(recordSize);
                 channel.read(recordBuffer);
                 recordBuffer.flip();
                 LogRecord record = LogRecord.deserialize(recordBuffer);
@@ -57,9 +58,14 @@ public class RecoveryManager {
         for (long lsn : doneLsns) {
             LogRecord doneRecord = records.get(lsn);
             if (doneRecord != null && doneRecord.getType() == LogRecord.OP_DONE) {
-                LogRecord originalRecord = records.get(doneRecord.getLsn());
-                if (originalRecord != null) {
-                    redo(originalRecord);
+                // The original LSN is stored in the DONE record's key field (8 bytes)
+                byte[] lsnBytes = doneRecord.getKey();
+                if (lsnBytes != null && lsnBytes.length == 8) {
+                    long originalLsn = ByteBuffer.wrap(lsnBytes).getLong();
+                    LogRecord originalRecord = records.get(originalLsn);
+                    if (originalRecord != null) {
+                        redo(originalRecord);
+                    }
                 }
             }
         }

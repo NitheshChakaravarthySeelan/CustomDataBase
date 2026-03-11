@@ -1,5 +1,6 @@
 package com.minidb;
 
+import com.minidb.monitoring.MetricsRegistry;
 import com.minidb.sql.executor.Executor;
 import com.minidb.sql.executor.Result;
 import com.minidb.sql.parser.Parser;
@@ -21,6 +22,7 @@ public class MiniDbRepl {
     }
 
     public void start() {
+        MetricsRegistry.getInstance(); // Initialize metrics
         System.out.println("MiniDB SQL REPL for node " + nodeId + ". Enter .exit to quit.");
         Scanner scanner = new Scanner(System.in);
         while (true) {

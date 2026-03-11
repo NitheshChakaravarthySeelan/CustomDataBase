@@ -6,6 +6,8 @@ import com.minidb.log.WALManager;
 import com.minidb.storage.RecordsSerializer.Row;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 public class RecordStorage {
 
@@ -28,14 +30,12 @@ public class RecordStorage {
         byte[] recordBytes = recordSerializer.serialize(row);
         Integer key = (Integer) row.values[0]; // Assuming PK is the first column
 
-        System.out.println("RecordStorage.insertRecord: Inserting key: " + key + ", row: " + row);
-
         // 1. Log the operation
         LogRecord logRecord = new LogRecord(0, LogRecord.OP_PUT, txn.getTxnId(), null, recordBytes);
         long lsn = walManager.appendAndFlush(logRecord);
 
         // 2. Find a page with enough space and insert
-        int pageId = 0; // Simplified page selection
+        int pageId = 2; // Start from page 2 (0: meta, 1: root)
         Page page = bufferPool.getPage(pageId);
         int slotId = -1;
         while ((slotId = page.insertRecord(recordBytes)) == -1) {
@@ -47,11 +47,11 @@ public class RecordStorage {
         RecordId rid = new RecordId(pageId, slotId);
 
         // 3. Update index
-        System.out.println("RecordStorage.insertRecord: Calling index.insert with key: " + key + ", rid: " + rid);
         index.insert(key, rid);
 
         // 4. Log the DONE operation
-        LogRecord doneRecord = new LogRecord(lsn, LogRecord.OP_DONE, txn.getTxnId(), null, null);
+        byte[] lsnBytes = ByteBuffer.allocate(8).putLong(lsn).array();
+        LogRecord doneRecord = new LogRecord(0, LogRecord.OP_DONE, txn.getTxnId(), lsnBytes, null);
         walManager.appendAndFlush(doneRecord);
 
         return rid;
@@ -73,12 +73,26 @@ public class RecordStorage {
         bufferPool.unpinPage(rid.getPageId(), true); // Mark page as dirty
 
         // 3. Log the DONE operation
-        LogRecord doneRecord = new LogRecord(lsn, LogRecord.OP_DONE, txn.getTxnId(), null, null);
+        byte[] lsnBytes = ByteBuffer.allocate(8).putLong(lsn).array();
+        LogRecord doneRecord = new LogRecord(0, LogRecord.OP_DONE, txn.getTxnId(), lsnBytes, null);
         walManager.appendAndFlush(doneRecord);
     }
 
     public Row fetchRecord(Integer key) throws IOException {
-        return null; // Hardcoded for debugging
+        RecordId rid = index.search(key);
+        if (rid == null) {
+            return null;
+        }
+        Page page = bufferPool.getPage(rid.getPageId());
+        try {
+            byte[] recordBytes = page.getRecord(rid.getSlotId());
+            if (recordBytes == null) {
+                return null;
+            }
+            return recordSerializer.deserialize(recordBytes);
+        } finally {
+            bufferPool.unpinPage(rid.getPageId(), false);
+        }
     }
     
     // This method is for recovery purposes and should not be logged.
@@ -86,7 +100,7 @@ public class RecordStorage {
         Row row = recordSerializer.deserialize(recordBytes);
         Integer key = (Integer) row.values[0];
 
-        int pageId = 0; // Simplified page selection
+        int pageId = 2; // Start from page 2 (0: meta, 1: root)
         Page page = bufferPool.getPage(pageId);
         int slotId = -1;
         while ((slotId = page.insertRecord(recordBytes)) == -1) {

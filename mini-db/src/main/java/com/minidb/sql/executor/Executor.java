@@ -1,9 +1,13 @@
 package com.minidb.sql.executor;
 
+import com.minidb.monitoring.MetricsRegistry;
 import com.minidb.sql.parser.ast.*;
 import com.minidb.txn.LockManager;
 import com.minidb.txn.Transaction;
 import com.minidb.txn.TxnManager;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 
 import java.util.List;
 import java.util.Optional;
@@ -17,6 +21,10 @@ public class Executor {
 
     private static final long LOCK_WAIT_MS = TimeUnit.SECONDS.toMillis(10);
 
+    private final MeterRegistry meterRegistry = MetricsRegistry.getInstance();
+    private final Timer executionTimer = meterRegistry.timer("minidb.executor.execution.time");
+    private final Counter queriesCounter = meterRegistry.counter("minidb.executor.queries.total");
+
     public Executor(TxnManager txnManager, com.minidb.log.WALManager walManager, LockManager lockManager, com.minidb.storage.RecordStorage recordStorage) {
         this.txnManager = txnManager;
         this.lockManager = lockManager;
@@ -24,18 +32,21 @@ public class Executor {
     }
 
     public Result execute(Command cmd) {
-        try {
-            if (cmd instanceof InsertCommand) {
-                return executeInsert((InsertCommand) cmd);
-            } else if (cmd instanceof SelectCommand) {
-                return executeSelect((SelectCommand) cmd);
-            } else if (cmd instanceof DeleteCommand) {
-                return executeDelete((DeleteCommand) cmd);
+        queriesCounter.increment();
+        return executionTimer.record(() -> {
+            try {
+                if (cmd instanceof InsertCommand) {
+                    return executeInsert((InsertCommand) cmd);
+                } else if (cmd instanceof SelectCommand) {
+                    return executeSelect((SelectCommand) cmd);
+                } else if (cmd instanceof DeleteCommand) {
+                    return executeDelete((DeleteCommand) cmd);
+                }
+                return Result.error("Unsupported command type");
+            } catch (Exception e) {
+                return Result.error(e.getMessage());
             }
-            return Result.error("Unsupported command type");
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        });
     }
 
     private Result executeSelect(SelectCommand cmd) {

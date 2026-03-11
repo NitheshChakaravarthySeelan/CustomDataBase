@@ -1,9 +1,0 @@
-/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/test/java/com/minidb/replication/ReplicationFlowTest.java
-/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/test/java/com/minidb/SqlTests.java
-/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/test/java/com/minidb/StorageTests.java
-/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/test/java/com/minidb/replication/SlaveRecoveryTest.java
-/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/test/java/com/minidb/TxnTests.java
-/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/test/java/com/minidb/AppTest.java
-/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/test/java/com/minidb/replication/LagAndResyncTest.java
-/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/test/java/com/minidb/BPlusTreeTests.java
-/mnt/auto-mount/Coding/Java/Learn Java/mini-db/src/test/java/com/minidb/WALTests.java

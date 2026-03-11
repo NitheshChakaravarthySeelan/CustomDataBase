@@ -199,8 +199,9 @@ public class InternalNode<K extends Comparable<K>, V> extends Node<K, V> {
     @Override
     public void writeNode() throws IOException {
         Page page = bufferPool.getPage(pageId);
+        page.setPageType((byte) 2);
         byte[] serializedData = serialize();
-        System.arraycopy(serializedData, 0, page.toBytes(), 0, serializedData.length);
+        System.arraycopy(serializedData, 0, page.toBytes(), Page.HEADER_SIZE, serializedData.length);
         page.setDirty(true);
         bufferPool.unpinPage(pageId, true);
     }
@@ -208,7 +209,10 @@ public class InternalNode<K extends Comparable<K>, V> extends Node<K, V> {
     @Override
     public void readNode() throws IOException {
         Page page = bufferPool.getPage(pageId);
-        deserialize(page.toBytes());
+        byte[] data = page.toBytes();
+        byte[] nodeData = new byte[data.length - Page.HEADER_SIZE];
+        System.arraycopy(data, Page.HEADER_SIZE, nodeData, 0, nodeData.length);
+        deserialize(nodeData);
         bufferPool.unpinPage(pageId, false);
     }
 

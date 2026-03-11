@@ -1,0 +1,5 @@
+#!/bin/bash
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+CP_DEPS=$(cat "$DIR/.minidb_cp")
+CLASSPATH="$DIR/target/classes:$DIR/target/test-classes:$CP_DEPS"
+java -cp "$CLASSPATH" com.minidb.MiniDb "$@"
